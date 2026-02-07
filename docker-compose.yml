@@ -17,7 +17,7 @@ services:
       retries: 5
 
   kafka:
-    image: apache/kafka:latest
+    image: apache/kafka:3.9.0
     container_name: orders-kafka
     ports:
       - "9092:9092"
@@ -41,14 +41,18 @@ services:
       timeout: 5s
       retries: 5
 
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: orders-kafka-ui
+  akhq:
+    image: tchiotludo/akhq:0.26.0
+    container_name: orders-akhq
     ports:
-      - "8080:8080"
+      - "5001:8080"
     environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      AKHQ_CONFIGURATION: |
+        akhq:
+          connections:
+            local:
+              properties:
+                bootstrap.servers: kafka:9092
     depends_on:
       kafka:
         condition: service_healthy
