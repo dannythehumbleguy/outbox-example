@@ -43,7 +43,7 @@ public static class DependencyInjection
                 .AddProducer(KafkaProducers.OrderEvents, producer => producer
                     .DefaultTopic(KafkaTopics.OrderEvents)
                     .AddMiddlewares(middlewares => middlewares
-                        .AddSerializer<JsonCoreSerializer>()))));
+                        .AddSerializer<JsonCoreSerializer, CustomMessageTypeResolver>()))));
 
         return services;
     }
