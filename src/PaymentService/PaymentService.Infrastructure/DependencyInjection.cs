@@ -4,14 +4,15 @@ using FluentMigrator.Runner.VersionTableInfo;
 using KafkaFlow;
 using KafkaFlow.Serializer;
 using Microsoft.Extensions.DependencyInjection;
-using OrderService.Application.Constants;
-using OrderService.Application.Interfaces;
-using OrderService.Application.Services;
-using OrderService.Infrastructure.Data;
-using OrderService.Infrastructure.Messaging;
-using OrderService.Infrastructure.Repositories;
+using PaymentService.Application.Constants;
+using PaymentService.Application.Events;
+using PaymentService.Application.Interfaces;
+using PaymentService.Application.Services;
+using PaymentService.Infrastructure.Data;
+using PaymentService.Infrastructure.Messaging;
+using PaymentService.Infrastructure.Repositories;
 
-namespace OrderService.Infrastructure;
+namespace PaymentService.Infrastructure;
 
 public static class DependencyInjection
 {
@@ -20,12 +21,11 @@ public static class DependencyInjection
         string connectionString,
         string kafkaBrokers)
     {
-        SqlMapper.AddTypeHandler(new OrderStatusTypeHandler());
+        SqlMapper.AddTypeHandler(new PaymentStatusTypeHandler());
 
         services.AddSingleton<IDbConnectionFactory>(new NpgsqlConnectionFactory(connectionString));
-        services.AddScoped<IOrderRepository, OrderRepository>();
-        services.AddScoped<IOrderService, OrderAppService>();
-        services.AddScoped<IEventPublisher, KafkaEventPublisher>();
+        services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddScoped<IPaymentService, PaymentAppService>();
 
         services.AddSingleton<IVersionTableMetaData, VersionTableMetaData>();
 
@@ -39,11 +39,15 @@ public static class DependencyInjection
         services.AddKafka(kafka => kafka
             .AddCluster(cluster => cluster
                 .WithBrokers(kafkaBrokers.Split(','))
-                .CreateTopicIfNotExists(KafkaTopics.OrderEvents, 1, 1)
-                .AddProducer(KafkaProducers.OrderEvents, producer => producer
-                    .DefaultTopic(KafkaTopics.OrderEvents)
+                .AddConsumer(consumer => consumer
+                    .Topic(KafkaTopics.OrderEvents)
+                    .WithGroupId(KafkaConsumerGroups.PaymentService)
+                    .WithBufferSize(100)
+                    .WithWorkersCount(1)
                     .AddMiddlewares(middlewares => middlewares
-                        .AddSerializer<JsonCoreSerializer>()))));
+                        .AddDeserializer<JsonCoreDeserializer>()
+                        .AddTypedHandlers(handlers => handlers
+                            .AddHandler<OrderCreatedHandler>())))));
 
         return services;
     }
@@ -51,6 +55,14 @@ public static class DependencyInjection
     public static void ApplyMigrations(IServiceProvider serviceProvider)
     {
         using var scope = serviceProvider.CreateScope();
+
+        var connectionFactory = scope.ServiceProvider.GetRequiredService<IDbConnectionFactory>();
+        using var connection = connectionFactory.CreateConnection();
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "CREATE SCHEMA IF NOT EXISTS payment";
+        command.ExecuteNonQuery();
+
         var runner = scope.ServiceProvider.GetRequiredService<IMigrationRunner>();
         runner.MigrateUp();
     }

@@ -10,7 +10,7 @@ public class OrderRepository(IDbConnectionFactory connectionFactory) : IOrderRep
     public async Task<Order> CreateAsync(Order order)
     {
         const string sql = """
-            INSERT INTO orders (id, goods_name, price, created_at, status)
+            INSERT INTO orders.orders (id, goods_name, price, created_at, status)
             VALUES (@Id, @GoodsName, @Price, @CreatedAt, @Status)
             RETURNING id, goods_name AS GoodsName, price, created_at AS CreatedAt, status
             """;

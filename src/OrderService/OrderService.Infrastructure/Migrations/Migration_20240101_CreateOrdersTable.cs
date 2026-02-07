@@ -7,8 +7,10 @@ public class Migration_20240101_CreateOrdersTable : Migration
 {
     public override void Up()
     {
+        Execute.Sql("CREATE SCHEMA IF NOT EXISTS orders");
+
         Execute.Sql(@"
-            CREATE TABLE orders (
+            CREATE TABLE orders.orders (
                 id UUID PRIMARY KEY,
                 goods_name VARCHAR(255) NOT NULL,
                 price DECIMAL(18, 2) NOT NULL,
@@ -20,6 +22,7 @@ public class Migration_20240101_CreateOrdersTable : Migration
 
     public override void Down()
     {
-        Execute.Sql("DROP TABLE IF EXISTS orders;");
+        Execute.Sql("DROP TABLE IF EXISTS orders.orders;");
+        Execute.Sql("DROP SCHEMA IF EXISTS orders");
     }
 }
