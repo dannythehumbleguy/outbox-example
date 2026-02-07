@@ -1,11 +1,11 @@
 services:
   postgres:
     image: postgres:17
-    container_name: orders-postgres
+    container_name: shop-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: ordersdb
+      POSTGRES_DB: shop
     ports:
       - "5432:5432"
     volumes:
@@ -67,7 +67,7 @@ services:
       - "5000:5000"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=ordersdb;Username=postgres;Password=postgres
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=shop;Username=postgres;Password=postgres
       Kafka__Brokers: kafka:9092
     depends_on:
       postgres:
@@ -84,7 +84,7 @@ services:
       - "5002:5002"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=ordersdb;Username=postgres;Password=postgres
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=shop;Username=postgres;Password=postgres
       Kafka__Brokers: kafka:9092
     depends_on:
       postgres:
