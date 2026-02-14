@@ -1,3 +1,4 @@
+using Confluent.Kafka;
 using Dapper;
 using FluentMigrator.Runner;
 using FluentMigrator.Runner.VersionTableInfo;
@@ -42,7 +43,14 @@ public static class DependencyInjection
                 .CreateTopicIfNotExists(KafkaTopics.OrderEvents, 1, 1)
                 .AddProducer(KafkaProducers.OrderEvents, producer => producer
                     .DefaultTopic(KafkaTopics.OrderEvents)
+                    .WithProducerConfig(new ProducerConfig
+                    {
+                        MessageSendMaxRetries = 3,
+                        MessageTimeoutMs = 5000,
+                        RequestTimeoutMs = 2000
+                    })
                     .AddMiddlewares(middlewares => middlewares
+                        .Add<SilentProducerMiddleware>()
                         .Add<TracingProducerMiddleware>()
                         .AddSerializer<JsonCoreSerializer, CustomMessageTypeResolver>()))));
 
