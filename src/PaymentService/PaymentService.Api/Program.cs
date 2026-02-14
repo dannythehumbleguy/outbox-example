@@ -1,4 +1,6 @@
 using KafkaFlow;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using PaymentService.Infrastructure;
 using Serilog;
 using Serilog.Sinks.Grafana.Loki;
@@ -25,6 +27,17 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 var kafkaBrokers = builder.Configuration["Kafka:Brokers"]
     ?? throw new InvalidOperationException("Kafka brokers configuration not found.");
+
+var tempoEndpoint = builder.Configuration["Otel:TempoEndpoint"]
+    ?? "http://localhost:4317";
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("payment-service"))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddSource("Npgsql")
+        .AddSource("PaymentService.Kafka")
+        .AddOtlpExporter(options => options.Endpoint = new Uri(tempoEndpoint)));
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

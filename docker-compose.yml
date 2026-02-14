@@ -72,12 +72,15 @@ services:
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=shop;Username=postgres;Password=postgres
       Kafka__Brokers: kafka:9092
       Loki__Url: http://loki:3100
+      Otel__TempoEndpoint: http://tempo:4317
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
         condition: service_healthy
       loki:
+        condition: service_started
+      tempo:
         condition: service_started
 
   payment-api:
@@ -92,12 +95,15 @@ services:
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=shop;Username=postgres;Password=postgres
       Kafka__Brokers: kafka:9092
       Loki__Url: http://loki:3100
+      Otel__TempoEndpoint: http://tempo:4317
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
         condition: service_healthy
       loki:
+        condition: service_started
+      tempo:
         condition: service_started
 
   loki:
@@ -107,6 +113,18 @@ services:
       - "3100:3100"
     volumes:
       - loki_data:/loki
+
+  tempo:
+    image: grafana/tempo:2.7.2
+    container_name: tempo
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml
+      - tempo_data:/var/tempo
 
   grafana:
     image: grafana/grafana:latest
@@ -122,9 +140,12 @@ services:
     depends_on:
       loki:
         condition: service_started
+      tempo:
+        condition: service_started
 
 volumes:
   postgres_data:
   kafka_data:
   loki_data:
   grafana_data:
+  tempo_data:
