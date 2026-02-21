@@ -15,11 +15,13 @@ builder.Host.UseSerilog((context, configuration) =>
     configuration
         .MinimumLevel.Information()
         .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
-        .WriteTo.Console()
+        .Enrich.WithProperty("Application", "order-service")
+        .WriteTo.Console(outputTemplate:
+            "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {TraceId} {SpanId}{NewLine}{Exception}")
         .WriteTo.GrafanaLoki(lokiUrl, labels:
         [
             new LokiLabel { Key = "app", Value = "order-service" }
-        ]);
+        ], propertiesAsLabels: ["TraceId", "SpanId"]);
 });
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -50,6 +52,8 @@ DependencyInjection.ApplyMigrations(app.Services);
 
 var kafkaBus = app.Services.CreateKafkaBus();
 await kafkaBus.StartAsync();
+
+app.UseSerilogRequestLogging();
 
 app.UseSwagger();
 app.UseSwaggerUI();

@@ -43,7 +43,7 @@ public static class DependencyInjection
                     .Topic(KafkaTopics.OrderEvents)
                     .WithGroupId(KafkaConsumerGroups.PaymentService)
                     .WithBufferSize(100)
-                    .WithWorkersCount(5)
+                    .WithWorkersCount(3)
                     .AddMiddlewares(middlewares => middlewares
                         .Add<TracingConsumerMiddleware>()
                         .AddDeserializer<JsonCoreDeserializer, CustomMessageTypeResolver>()

@@ -123,7 +123,7 @@ services:
       - "4317:4317"
       - "4318:4318"
     volumes:
-      - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml
+      - ./devops/tempo/tempo.yaml:/etc/tempo/tempo.yaml
       - tempo_data:/var/tempo
 
   grafana:
@@ -136,7 +136,7 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning/datasources/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./devops/grafana/provisioning/datasources/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
     depends_on:
       loki:
         condition: service_started
