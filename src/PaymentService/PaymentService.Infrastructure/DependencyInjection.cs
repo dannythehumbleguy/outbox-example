@@ -42,6 +42,7 @@ public static class DependencyInjection
                 .AddConsumer(consumer => consumer
                     .Topic(KafkaTopics.OrderEvents)
                     .WithGroupId(KafkaConsumerGroups.PaymentService)
+                    .WithManualMessageCompletion()
                     .WithBufferSize(100)
                     .WithWorkersCount(3)
                     .AddMiddlewares(middlewares => middlewares

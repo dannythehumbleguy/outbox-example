@@ -19,6 +19,7 @@ public class OrderCreatedHandler(IServiceProvider serviceProvider, ILogger<Order
 
         await paymentService.ProcessOrderAsync(message.Id, message.Price);
 
+        context.ConsumerContext.Complete();
         logger.LogInformation("Payment processed for OrderId={OrderId}", message.Id);
     }
 }

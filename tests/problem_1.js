@@ -43,8 +43,8 @@ export default function () {
 //
 // VERIFICATION (run after the test completes)
 //
-//  SELECT COUNT(*) AS count, SUM(price) AS money FROM orders.orders
-//  UNION ALL
-//  SELECT COUNT(*) AS count, SUM(amount) AS money FROM payment.payments;
+// SELECT 'orders' as name, COUNT(*) AS count, SUM(price) AS money FROM orders.orders
+// UNION ALL
+// SELECT 'payments' as name, COUNT(*) AS count, SUM(amount) AS money FROM payment.payments;
 //
 //  -> orders count > payments count: events buffered during the outage were lost
