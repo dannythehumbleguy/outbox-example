@@ -10,15 +10,18 @@ public class OutboxMessage
     public string Type { get; set; } = string.Empty;
     public string Payload { get; set; } = string.Empty;
     public OutboxMessageStatus Status { get; set; } = OutboxMessageStatus.Created;
+}
 
-    public static OutboxMessage From<T>(T payload) where T : class => new()
+public static class OutboxMessageExtensions
+{
+    public static OutboxMessage ToOutboxMessage<T>(this T payload) where T : class => new()
     {
         Id = Guid.NewGuid(),
         OccurredOn = DateTimeOffset.UtcNow,
         Type = typeof(T).Name,
         Payload = JsonSerializer.Serialize(payload)
     };
-}
+} 
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum OutboxMessageStatus

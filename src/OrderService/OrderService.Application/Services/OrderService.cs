@@ -22,12 +22,11 @@ public class OrderAppService(
         };
 
         var orderCreatedEvent = new OrderCreatedEvent(order.Id, order.Price);
-        var outboxMessage = OutboxMessage.From(orderCreatedEvent);
 
         var createdOrder = await unitOfWork.ExecuteAsync(async (conn, tx) =>
         {
             var result = await orderRepository.CreateAsync(order, conn, tx);
-            await outboxRepository.CreateAsync(outboxMessage, conn, tx);
+            await outboxRepository.CreateAsync(orderCreatedEvent.ToOutboxMessage(), conn, tx);
             return result;
         });
 
