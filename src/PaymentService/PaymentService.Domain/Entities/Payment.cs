@@ -7,4 +7,5 @@ public class Payment
     public decimal Amount { get; set; }
     public DateTime CreatedAt { get; set; }
     public PaymentStatus Status { get; set; }
+    public Guid IdempotencyKey { get; set; }
 }

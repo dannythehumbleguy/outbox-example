@@ -56,7 +56,7 @@ public class OutboxPublisherWorker(
 
         try
         {
-            await handler.HandleAsync(message.Payload);
+            await handler.HandleAsync(message.Payload, message.Id);
 
             using var connection = connectionFactory.CreateConnection();
             await connection.ExecuteAsync(updateSql, new { message.Id });

@@ -2,5 +2,5 @@ namespace OrderService.Application.Interfaces;
 
 public interface IEventPublisher
 {
-    Task PublishAsync<T>(string topic, T message) where T : class;
+    Task PublishAsync<T>(string topic, T message, Guid idempotencyKey) where T : class;
 }

@@ -5,7 +5,7 @@ namespace PaymentService.Application.Services;
 
 public class PaymentAppService(IPaymentRepository paymentRepository) : IPaymentService
 {
-    public async Task<Payment> ProcessOrderAsync(Guid orderId, decimal amount)
+    public async Task<Payment> ProcessOrderAsync(Guid orderId, decimal amount, Guid idempotencyKey)
     {
         var payment = new Payment
         {
@@ -13,7 +13,8 @@ public class PaymentAppService(IPaymentRepository paymentRepository) : IPaymentS
             OrderId = orderId,
             Amount = amount,
             CreatedAt = DateTime.UtcNow,
-            Status = PaymentStatus.Completed
+            Status = PaymentStatus.Completed,
+            IdempotencyKey = idempotencyKey
         };
 
         return await paymentRepository.CreateAsync(payment);
