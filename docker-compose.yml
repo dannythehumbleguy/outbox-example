@@ -138,6 +138,7 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./devops/grafana/provisioning/datasources/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./devops/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
     depends_on:
       loki:
         condition: service_started
