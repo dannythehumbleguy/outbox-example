@@ -40,13 +40,13 @@ public static class DependencyInjection
         services.AddKafka(kafka => kafka
             .AddCluster(cluster => cluster
                 .WithBrokers(kafkaBrokers.Split(','))
-                .CreateTopicIfNotExists(KafkaTopics.OrderEvents, 1, 1)
+                .CreateTopicIfNotExists(KafkaTopics.OrderEvents, 3, 1)
                 .AddProducer(KafkaProducers.OrderEvents, producer => producer
                     .DefaultTopic(KafkaTopics.OrderEvents)
                     .WithProducerConfig(new ProducerConfig
                     {
-                        MessageSendMaxRetries = 3,
-                        MessageTimeoutMs = 5000,
+                        MessageSendMaxRetries = int.MaxValue,
+                        MessageTimeoutMs = 0, // 0 = infinite, never expire buffered messages
                         RequestTimeoutMs = 2000
                     })
                     .AddMiddlewares(middlewares => middlewares

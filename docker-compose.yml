@@ -35,6 +35,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 3
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
@@ -60,7 +61,7 @@ services:
       kafka:
         condition: service_healthy
 
-  api:
+  orders-api:
     build:
       context: ./src/OrderService
       dockerfile: OrderService.Api/Dockerfile
