@@ -22,11 +22,16 @@ public static class DependencyInjection
         string kafkaBrokers)
     {
         SqlMapper.AddTypeHandler(new OrderStatusTypeHandler());
+        SqlMapper.AddTypeHandler(new OutboxMessageStatusTypeHandler());
 
         services.AddSingleton<IDbConnectionFactory>(new NpgsqlConnectionFactory(connectionString));
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddScoped<IOutboxMessageRepository, OutboxMessageRepository>();
         services.AddScoped<IOrderService, OrderAppService>();
         services.AddScoped<IEventPublisher, KafkaEventPublisher>();
+        services.AddScoped<IOutboxMessageHandler, OrderCreatedOutboxHandler>();
+        services.AddHostedService<OutboxPublisherWorker>();
 
         services.AddSingleton<IVersionTableMetaData, VersionTableMetaData>();
 

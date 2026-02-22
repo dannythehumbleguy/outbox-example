@@ -1,4 +1,3 @@
-using OrderService.Application.Constants;
 using OrderService.Application.Dto;
 using OrderService.Application.Events;
 using OrderService.Application.Interfaces;
@@ -6,7 +5,10 @@ using OrderService.Domain.Entities;
 
 namespace OrderService.Application.Services;
 
-public class OrderAppService(IOrderRepository orderRepository, IEventPublisher eventPublisher) : IOrderService
+public class OrderAppService(
+    IUnitOfWork unitOfWork,
+    IOrderRepository orderRepository,
+    IOutboxMessageRepository outboxRepository) : IOrderService
 {
     public async Task<OrderResponse> CreateOrderAsync(CreateOrderRequest request)
     {
@@ -15,14 +17,19 @@ public class OrderAppService(IOrderRepository orderRepository, IEventPublisher e
             Id = Guid.NewGuid(),
             GoodsName = request.GoodsName,
             Price = request.Price,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
             Status = OrderStatus.Created
         };
 
-        var createdOrder = await orderRepository.CreateAsync(order);
+        var orderCreatedEvent = new OrderCreatedEvent(order.Id, order.Price);
+        var outboxMessage = OutboxMessage.From(orderCreatedEvent);
 
-        var orderCreatedEvent = new OrderCreatedEvent(createdOrder.Id, createdOrder.Price);
-        await eventPublisher.PublishAsync(KafkaTopics.OrderEvents, orderCreatedEvent);
+        var createdOrder = await unitOfWork.ExecuteAsync(async (conn, tx) =>
+        {
+            var result = await orderRepository.CreateAsync(order, conn, tx);
+            await outboxRepository.CreateAsync(outboxMessage, conn, tx);
+            return result;
+        });
 
         return new OrderResponse
         {

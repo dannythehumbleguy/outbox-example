@@ -39,12 +39,12 @@ export default function () {
 // 1. Start the test:
 //      k6 run tests/problem_1.js
 //
-// 2. docker pause orders-kafka; Start-Sleep 10; docker restart orders-api; docker unpause orders-kafka
+// 2. docker pause orders-kafka; Start-Sleep 10; docker pause orders-api; Start-Sleep 2; docker unpause orders-api; Start-Sleep 2; docker unpause orders-kafka
 //
 // VERIFICATION (run after the test completes)
 //
-// SELECT 'orders' as name, COUNT(*) AS count, SUM(price) AS money FROM orders.orders
-// UNION ALL
-// SELECT 'payments' as name, COUNT(*) AS count, SUM(amount) AS money FROM payment.payments;
+//  SELECT COUNT(*) AS count, SUM(price) AS money FROM orders.orders
+//  UNION ALL
+//  SELECT COUNT(*) AS count, SUM(amount) AS money FROM payment.payments;
 //
 //  -> orders count > payments count: events buffered during the outage were lost
