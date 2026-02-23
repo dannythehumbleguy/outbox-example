@@ -37,7 +37,7 @@ export default function () {
 // HOW TO RUN
 //
 // 1. Start the test:
-//      k6 run tests/problem_1.js
+//      k6 run tests/testcase_1.js
 //
 // 2. docker pause orders-kafka; Start-Sleep 10; docker restart orders-api; docker unpause orders-kafka
 //
