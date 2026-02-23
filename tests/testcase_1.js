@@ -39,7 +39,7 @@ export default function () {
 // 1. Start the test:
 //      k6 run tests/testcase_1.js
 //
-// 2. docker pause orders-kafka; Start-Sleep 10; docker pause orders-api; Start-Sleep 2; docker unpause orders-api; Start-Sleep 2; docker unpause orders-kafka
+// 2. docker pause orders-kafka; Start-Sleep 10; docker restart orders-api; docker unpause orders-kafka
 //
 // VERIFICATION (run after the test completes)
 //
