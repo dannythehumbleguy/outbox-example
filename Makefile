@@ -1,6 +1,7 @@
 SCALE ?= 3
 
 .PHONY: up up-infra down build scale ps logs-orders logs-payment \
+        restart-orders restart-orders-one \
         load-test pause-kafka unpause-kafka db-check db-reset help
 
 ## Start the full stack with scaled services (default: 3 instances each)
@@ -39,26 +40,10 @@ logs-orders:
 logs-payment:
 	docker compose logs -f payment-api
 
-## Run k6 load test
-load-test:
-	k6 run tests/problem_1.js
+## Restart all orders-api instances
+restart-orders:
+	docker compose restart orders-api
 
-## Simulate Kafka outage (pause broker container)
-pause-kafka:
-	docker pause orders-kafka
-
-## Restore Kafka after simulated outage
-unpause-kafka:
-	docker unpause orders-kafka
-
-## Check order/payment count and total — reveals inconsistency
-db-check:
-	docker exec shop-postgres psql -U postgres -d shop -c \
-		"SELECT 'orders' AS source, COUNT(*) AS count, SUM(price) AS total FROM orders.orders \
-		 UNION ALL \
-		 SELECT 'payments', COUNT(*), SUM(amount) FROM payment.payments;"
-
-## Truncate orders and payments tables
-db-reset:
-	docker exec shop-postgres psql -U postgres -d shop -c \
-		"TRUNCATE orders.orders, payment.payments;"
+## Restart one orders-api instance by number (e.g. make restart-orders-one N=2)
+restart-orders-one:
+	docker restart $$(docker compose ps -q orders-api | sed -n '$(N)p')

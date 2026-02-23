@@ -61,6 +61,29 @@ services:
       kafka:
         condition: service_healthy
 
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.25.1-p0
+    container_name: pgbouncer
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: shop
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 20
+      AUTH_TYPE: scram-sha-256
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   traefik:
     image: traefik:v3.2
     container_name: traefik
@@ -85,7 +108,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       PathBase: /orders
-      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=shop;Username=postgres;Password=postgres
+      ConnectionStrings__DefaultConnection: Host=pgbouncer;Port=5432;Database=shop;Username=postgres;Password=postgres;No Reset On Close=true
       Kafka__Brokers: kafka:9092
       Loki__Url: http://loki:3100
       Otel__TempoEndpoint: http://tempo:4317
@@ -94,7 +117,7 @@ services:
       - "traefik.http.routers.orders.entrypoints=web"
       - "traefik.http.routers.orders.rule=PathPrefix(`/orders`)"
     depends_on:
-      postgres:
+      pgbouncer:
         condition: service_healthy
       kafka:
         condition: service_healthy
@@ -110,7 +133,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       PathBase: /payments
-      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=shop;Username=postgres;Password=postgres
+      ConnectionStrings__DefaultConnection: Host=pgbouncer;Port=5432;Database=shop;Username=postgres;Password=postgres;No Reset On Close=true
       Kafka__Brokers: kafka:9092
       Loki__Url: http://loki:3100
       Otel__TempoEndpoint: http://tempo:4317
@@ -119,7 +142,7 @@ services:
       - "traefik.http.routers.payment.entrypoints=web"
       - "traefik.http.routers.payment.rule=PathPrefix(`/payments`)"
     depends_on:
-      postgres:
+      pgbouncer:
         condition: service_healthy
       kafka:
         condition: service_healthy
