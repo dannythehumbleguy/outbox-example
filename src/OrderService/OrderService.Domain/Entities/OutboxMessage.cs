@@ -27,5 +27,6 @@ public static class OutboxMessageExtensions
 public enum OutboxMessageStatus
 {
     Created,
+    Processing,
     Processed
 }
