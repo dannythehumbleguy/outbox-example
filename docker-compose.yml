@@ -61,19 +61,38 @@ services:
       kafka:
         condition: service_healthy
 
+  traefik:
+    image: traefik:v3.2
+    container_name: traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    depends_on:
+      - orders-api
+      - payment-api
+
   orders-api:
     build:
       context: ./src/OrderService
       dockerfile: OrderService.Api/Dockerfile
-    container_name: orders-api
-    ports:
-      - "5000:5000"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
+      PathBase: /orders
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=shop;Username=postgres;Password=postgres
       Kafka__Brokers: kafka:9092
       Loki__Url: http://loki:3100
       Otel__TempoEndpoint: http://tempo:4317
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.orders.entrypoints=web"
+      - "traefik.http.routers.orders.rule=PathPrefix(`/orders`)"
     depends_on:
       postgres:
         condition: service_healthy
@@ -88,15 +107,17 @@ services:
     build:
       context: ./src/PaymentService
       dockerfile: PaymentService.Api/Dockerfile
-    container_name: payment-api
-    ports:
-      - "5002:5002"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
+      PathBase: /payments
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=shop;Username=postgres;Password=postgres
       Kafka__Brokers: kafka:9092
       Loki__Url: http://loki:3100
       Otel__TempoEndpoint: http://tempo:4317
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.payment.entrypoints=web"
+      - "traefik.http.routers.payment.rule=PathPrefix(`/payments`)"
     depends_on:
       postgres:
         condition: service_healthy

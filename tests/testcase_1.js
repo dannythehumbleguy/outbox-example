@@ -25,7 +25,7 @@ export default function () {
         price: 10.00, // fixed price makes verification easy
     });
 
-    const res = http.post('http://localhost:5000/api/orders', payload, {
+    const res = http.post('http://localhost/orders/api/orders', payload, {
         headers: { 'Content-Type': 'application/json' },
     });
 

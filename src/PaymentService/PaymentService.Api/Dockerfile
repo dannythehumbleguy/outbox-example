@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgssapi-krb5-
 WORKDIR /app
 COPY --from=build /app/publish .
 
-ENV ASPNETCORE_URLS=http://+:5002
-EXPOSE 5002
+ENV ASPNETCORE_URLS=http://+:80
+EXPOSE 80
 
 ENTRYPOINT ["dotnet", "PaymentService.Api.dll"]

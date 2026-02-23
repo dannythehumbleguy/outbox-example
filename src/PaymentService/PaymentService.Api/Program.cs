@@ -16,11 +16,13 @@ builder.Host.UseSerilog((context, configuration) =>
         .MinimumLevel.Information()
         .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
         .Enrich.WithProperty("Application", "payment-service")
+        .Enrich.WithProperty("Instance", Environment.MachineName)
         .WriteTo.Console(outputTemplate:
             "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {TraceId} {SpanId}{NewLine}{Exception}")
         .WriteTo.GrafanaLoki(lokiUrl, labels:
         [
-            new LokiLabel { Key = "app", Value = "payment-service" }
+            new LokiLabel { Key = "app", Value = "payment-service" },
+            new LokiLabel { Key = "instance", Value = Environment.MachineName }
         ], propertiesAsLabels: ["TraceId", "SpanId"]);
 });
 
@@ -34,7 +36,7 @@ var tempoEndpoint = builder.Configuration["Otel:TempoEndpoint"]
     ?? "http://localhost:4317";
 
 builder.Services.AddOpenTelemetry()
-    .ConfigureResource(resource => resource.AddService("payment-service"))
+    .ConfigureResource(resource => resource.AddService("payment-service", serviceInstanceId: Environment.MachineName))
     .WithTracing(tracing => tracing
         .AddAspNetCoreInstrumentation()
         .AddSource("Npgsql")
@@ -47,6 +49,10 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddInfrastructure(connectionString, kafkaBrokers);
 
 var app = builder.Build();
+
+var pathBase = builder.Configuration["PathBase"] ?? "";
+if (!string.IsNullOrEmpty(pathBase))
+    app.UsePathBase(pathBase);
 
 DependencyInjection.ApplyMigrations(app.Services);
 
