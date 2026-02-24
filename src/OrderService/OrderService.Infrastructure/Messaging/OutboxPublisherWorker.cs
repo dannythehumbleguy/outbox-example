@@ -13,72 +13,82 @@ public class OutboxPublisherWorker(
     IServiceScopeFactory scopeFactory,
     ILogger<OutboxPublisherWorker> logger) : BackgroundService
 {
+    private const int BatchSize = 100;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            await ProcessOutboxMessageAsync();
+            await ProcessOutboxMessagesAsync();
         }
     }
 
-    private async Task ProcessOutboxMessageAsync()
+    private async Task ProcessOutboxMessagesAsync()
     {
-        OutboxMessage? message;
+        List<OutboxMessage> messages;
         using (var connection = connectionFactory.CreateConnection())
         {
             connection.Open();
             using var transaction = connection.BeginTransaction();
 
-            var selectSql = 
+            messages = (await connection.QueryAsync<OutboxMessage>(
                 $"""
-                 SELECT id AS Id, occurred_on AS OccurredOn, type AS Type, payload AS Payload, status AS Status
+                 SELECT id AS Id, occurred_on AS OccurredOn, type AS Type, payload AS Payload, status AS Status, processed_at AS ProcessedAt
                  FROM orders.outbox_messages
                  WHERE status = '{nameof(OutboxMessageStatus.Created)}'
-                 LIMIT 1
+                 LIMIT {BatchSize}
                  FOR UPDATE SKIP LOCKED
-                 """;
-            message = await connection.QuerySingleOrDefaultAsync<OutboxMessage>(selectSql, transaction: transaction);
+                 """,
+                transaction: transaction)).AsList();
 
-            if (message is null) return;
+            if (messages.Count == 0) return;
 
-            
-            var processingUpdateSql = 
+            await connection.ExecuteAsync(
                 $"""
                  UPDATE orders.outbox_messages
                  SET status = '{nameof(OutboxMessageStatus.Processing)}'
-                 WHERE id = @Id
-                 """;
-            await connection.ExecuteAsync(processingUpdateSql, new { message.Id }, transaction: transaction);
+                 WHERE id = ANY(@Ids)
+                 """,
+                new { Ids = messages.Select(m => m.Id).ToArray() },
+                transaction: transaction);
+
             transaction.Commit();
         }
 
         using var scope = scopeFactory.CreateScope();
         var handlers = scope.ServiceProvider.GetRequiredService<IEnumerable<IOutboxMessageHandler>>();
-        var handler = handlers.FirstOrDefault(h => h.MessageType == message.Type);
+        var processedMessages = new List<OutboxMessage>();
 
-        if (handler is null)
+        foreach (var message in messages)
         {
-            logger.LogWarning("No handler registered for outbox message type: {Type}", message.Type);
-            return;
+            var handler = handlers.FirstOrDefault(h => h.MessageType == message.Type);
+
+            if (handler is null)
+            {
+                logger.LogWarning("No handler registered for outbox message type: {Type}", message.Type);
+                continue;
+            }
+
+            try
+            {
+                await handler.HandleAsync(message.Payload, message.Id);
+                processedMessages.Add(message);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to publish outbox message {Id} of type {Type}", message.Id, message.Type);
+            }
         }
 
-        try
-        {
-            await handler.HandleAsync(message.Payload, message.Id);
+        if (processedMessages.Count == 0) return;
 
-            using var connection = connectionFactory.CreateConnection();
-            var processedUpdateSql = 
-                $"""
-                 UPDATE orders.outbox_messages
-                 SET status = '{nameof(OutboxMessageStatus.Processed)}'
-                 WHERE id = @Id
-                 """;
-
-            await connection.ExecuteAsync(processedUpdateSql, new { message.Id });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to publish outbox message {Id} of type {Type}", message.Id, message.Type);
-        }
+        using var updateConnection = connectionFactory.CreateConnection();
+        await updateConnection.ExecuteAsync(
+            $"""
+             UPDATE orders.outbox_messages
+             SET status = '{nameof(OutboxMessageStatus.Processed)}', processed_at = @ProcessedAt
+             WHERE id = ANY(@Ids)
+             """,
+            new { Ids = processedMessages.Select(m => m.Id).ToArray(), ProcessedAt = DateTimeOffset.UtcNow });
     }
 }
