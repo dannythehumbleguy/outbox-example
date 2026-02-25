@@ -105,6 +105,7 @@ services:
     build:
       context: ./src/OrderService
       dockerfile: OrderService.Api/Dockerfile
+    restart: always
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       PathBase: /orders
@@ -130,6 +131,7 @@ services:
     build:
       context: ./src/PaymentService
       dockerfile: PaymentService.Api/Dockerfile
+    restart: always
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       PathBase: /payments

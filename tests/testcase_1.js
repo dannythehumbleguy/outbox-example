@@ -11,7 +11,7 @@ import { check } from 'k6';
 export const options = {
     stages: [
         { duration: '5s', target: 50 },   // ramp up
-        { duration: '40s', target: 50 },  // sustained load
+        { duration: '60s', target: 50 },  // sustained load
         { duration: '5s', target: 0 },    // ramp down
     ],
     thresholds: {

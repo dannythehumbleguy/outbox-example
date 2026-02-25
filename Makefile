@@ -28,22 +28,9 @@ scale:
 		--scale orders-api=$(SCALE) \
 		--scale payment-api=$(SCALE)
 
-## Show running containers
-ps:
-	docker compose ps
-
-## Follow logs for all orders-api instances
-logs-orders:
-	docker compose logs -f orders-api
-
-## Follow logs for all payment-api instances
-logs-payment:
-	docker compose logs -f payment-api
-
-## Restart all orders-api instances
-restart-orders:
-	docker compose restart orders-api
 
 ## Restart one orders-api instance by number (e.g. make restart-orders-one N=2)
-restart-orders-one:
-	docker restart $$(docker compose ps -q orders-api | sed -n '$(N)p')
+restart-orders-3:
+	docker restart outbox-example-orders-api-1
+	docker restart outbox-example-orders-api-2
+	docker restart outbox-example-orders-api-3
