@@ -4,6 +4,7 @@ using FluentMigrator.Runner;
 using FluentMigrator.Runner.VersionTableInfo;
 using KafkaFlow;
 using KafkaFlow.Serializer;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OrderService.Application.Constants;
 using OrderService.Application.Interfaces;
@@ -18,9 +19,11 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
+        IConfiguration configuration,
         string connectionString,
         string kafkaBrokers)
     {
+        services.Configure<OutboxHeartbeatOptions>(configuration.GetSection(OutboxHeartbeatOptions.SectionName));
         SqlMapper.AddTypeHandler(new OrderStatusTypeHandler());
         SqlMapper.AddTypeHandler(new OutboxMessageStatusTypeHandler());
 
@@ -32,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<IEventPublisher, KafkaEventPublisher>();
         services.AddScoped<IOutboxMessageHandler, OrderCreatedOutboxHandler>();
         services.AddHostedService<OutboxPublisherWorker>();
+        services.AddHostedService<OutboxHeartbeatWorker>();
 
         services.AddSingleton<IVersionTableMetaData, VersionTableMetaData>();
 

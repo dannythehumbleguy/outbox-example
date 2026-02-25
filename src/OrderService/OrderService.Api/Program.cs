@@ -46,7 +46,7 @@ builder.Services.AddOpenTelemetry()
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddInfrastructure(connectionString, kafkaBrokers);
+builder.Services.AddInfrastructure(builder.Configuration, connectionString, kafkaBrokers);
 
 var app = builder.Build();
 

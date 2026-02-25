@@ -46,10 +46,10 @@ public class OutboxPublisherWorker(
             await connection.ExecuteAsync(
                 $"""
                  UPDATE orders.outbox_messages
-                 SET status = '{nameof(OutboxMessageStatus.Processing)}'
+                 SET status = '{nameof(OutboxMessageStatus.Processing)}', started_processing_at = @Now
                  WHERE id = ANY(@Ids)
                  """,
-                new { Ids = messages.Select(m => m.Id).ToArray() },
+                new { Ids = messages.Select(m => m.Id).ToArray(), Now = DateTimeOffset.UtcNow },
                 transaction: transaction);
 
             transaction.Commit();

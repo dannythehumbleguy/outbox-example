@@ -10,6 +10,7 @@ public class OutboxMessage
     public string Type { get; set; } = string.Empty;
     public string Payload { get; set; } = string.Empty;
     public OutboxMessageStatus Status { get; set; } = OutboxMessageStatus.Created;
+    public DateTimeOffset? StartedProcessingAt { get; set; }
     public DateTimeOffset? ProcessedAt { get; set; }
 }
 
