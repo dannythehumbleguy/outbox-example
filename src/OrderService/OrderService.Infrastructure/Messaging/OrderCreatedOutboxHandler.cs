@@ -12,7 +12,6 @@ public class OrderCreatedOutboxHandler(IEventPublisher eventPublisher) : IOutbox
     public async Task HandleAsync(string payload, Guid messageId)
     {
         var evt = JsonSerializer.Deserialize<OrderCreatedEvent>(payload)!;
-        await Task.Delay(100);
         await eventPublisher.PublishAsync(KafkaTopics.OrderEvents, evt, messageId);
     }
 }
