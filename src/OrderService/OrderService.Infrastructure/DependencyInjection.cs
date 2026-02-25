@@ -55,7 +55,6 @@ public static class DependencyInjection
                         RequestTimeoutMs = 2000
                     })
                     .AddMiddlewares(middlewares => middlewares
-                        .Add<SilentProducerMiddleware>()
                         .Add<TracingProducerMiddleware>()
                         .AddSerializer<JsonCoreSerializer, CustomMessageTypeResolver>()))));
 
