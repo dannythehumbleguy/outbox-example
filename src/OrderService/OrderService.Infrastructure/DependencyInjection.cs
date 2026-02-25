@@ -24,6 +24,7 @@ public static class DependencyInjection
         string kafkaBrokers)
     {
         services.Configure<OutboxHeartbeatOptions>(configuration.GetSection(OutboxHeartbeatOptions.SectionName));
+        services.Configure<OutboxOptions>(configuration.GetSection(OutboxOptions.SectionName));
         SqlMapper.AddTypeHandler(new OrderStatusTypeHandler());
         SqlMapper.AddTypeHandler(new OutboxMessageStatusTypeHandler());
 

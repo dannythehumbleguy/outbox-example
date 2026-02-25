@@ -26,7 +26,7 @@ public class OrderAppService(
         var createdOrder = await unitOfWork.ExecuteAsync(async (conn, tx) =>
         {
             var result = await orderRepository.CreateAsync(order, conn, tx);
-            await outboxRepository.CreateAsync(orderCreatedEvent.ToOutboxMessage(), conn, tx);
+            await outboxRepository.CreateAsync(orderCreatedEvent, conn, tx);
             return result;
         });
 

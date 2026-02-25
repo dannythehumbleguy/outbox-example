@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace OrderService.Domain.Entities;
@@ -12,23 +11,18 @@ public class OutboxMessage
     public OutboxMessageStatus Status { get; set; } = OutboxMessageStatus.Created;
     public DateTimeOffset? StartedProcessingAt { get; set; }
     public DateTimeOffset? ProcessedAt { get; set; }
+    public int RetryCount { get; set; } = 0;
+    public int MaxRetries { get; set; }
+    public DateTimeOffset? LastAttemptedAt { get; set; }
+    public DateTimeOffset NextRetryAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
-public static class OutboxMessageExtensions
-{
-    public static OutboxMessage ToOutboxMessage<T>(this T payload) where T : class => new()
-    {
-        Id = Guid.NewGuid(),
-        OccurredOn = DateTimeOffset.UtcNow,
-        Type = typeof(T).Name,
-        Payload = JsonSerializer.Serialize(payload)
-    };
-} 
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum OutboxMessageStatus
 {
     Created,
     Processing,
-    Processed
+    Processed,
+    Failed
 }
