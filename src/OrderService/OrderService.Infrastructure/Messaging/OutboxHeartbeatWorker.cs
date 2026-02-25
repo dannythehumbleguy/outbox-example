@@ -12,6 +12,7 @@ public class OutboxHeartbeatWorker(
     IOptions<OutboxHeartbeatOptions> options,
     ILogger<OutboxHeartbeatWorker> logger) : BackgroundService
 {
+    // Must be greater than the kafka MessageTimeoutMs to prevent early resetting.
     private readonly TimeSpan _processingTimeout = TimeSpan.FromSeconds(options.Value.ProcessingTimeoutSeconds);
     private readonly TimeSpan _pollingInterval = TimeSpan.FromSeconds(options.Value.PollingIntervalSeconds);
 

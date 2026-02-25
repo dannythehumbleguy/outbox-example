@@ -46,6 +46,10 @@ public static class DependencyInjection
                 .ScanIn(typeof(DependencyInjection).Assembly).For.Migrations())
             .AddLogging(lb => lb.AddFluentMigratorConsole());
 
+        var producerOptions = configuration
+            .GetSection(KafkaProducerOptions.SectionName)
+            .Get<KafkaProducerOptions>() ?? new KafkaProducerOptions();
+
         services.AddKafka(kafka => kafka
             .AddCluster(cluster => cluster
                 .WithBrokers(kafkaBrokers.Split(','))
@@ -54,9 +58,9 @@ public static class DependencyInjection
                     .DefaultTopic(KafkaTopics.OrderEvents)
                     .WithProducerConfig(new ProducerConfig
                     {
-                        MessageSendMaxRetries = int.MaxValue,
-                        MessageTimeoutMs = 0, // 0 = infinite, never expire buffered messages
-                        RequestTimeoutMs = 2000
+                        MessageSendMaxRetries = producerOptions.MessageSendMaxRetries,
+                        MessageTimeoutMs = producerOptions.MessageTimeoutMs,
+                        RequestTimeoutMs = producerOptions.RequestTimeoutMs
                     })
                     .AddMiddlewares(middlewares => middlewares
                         .Add<TracingProducerMiddleware>()
