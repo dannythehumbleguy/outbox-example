@@ -22,7 +22,7 @@ Each branch from 1 to 8 contains an improved implementation where bugs are fixed
 **3. docker compose**  
 **4. make**  
 **5. k6**  
-**6. Commands below adapted are suitable only for windows**
+**6. Commands below are adapted only for windows**
 
 # Anomalies reproduction
 
