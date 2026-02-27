@@ -25,6 +25,7 @@ public static class DependencyInjection
     {
         services.Configure<OutboxHeartbeatOptions>(configuration.GetSection(OutboxHeartbeatOptions.SectionName));
         services.Configure<OutboxOptions>(configuration.GetSection(OutboxOptions.SectionName));
+        services.Configure<OutboxCleanupOptions>(configuration.GetSection(OutboxCleanupOptions.SectionName));
         SqlMapper.AddTypeHandler(new OrderStatusTypeHandler());
         SqlMapper.AddTypeHandler(new OutboxMessageStatusTypeHandler());
 
@@ -37,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<IOutboxMessageHandler, OrderCreatedOutboxHandler>();
         services.AddHostedService<OutboxPublisherWorker>();
         services.AddHostedService<OutboxHeartbeatWorker>();
+        services.AddHostedService<OutboxCleanupWorker>();
 
         services.AddSingleton<IVersionTableMetaData, VersionTableMetaData>();
 

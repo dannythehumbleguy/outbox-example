@@ -15,8 +15,6 @@ public class OutboxPublisherWorker(
     IOptions<OutboxOptions> options,
     ILogger<OutboxPublisherWorker> logger) : BackgroundService
 {
-    private const int BatchSize = 100;
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -42,7 +40,7 @@ public class OutboxPublisherWorker(
                  WHERE status IN ('{nameof(OutboxMessageStatus.Created)}', '{nameof(OutboxMessageStatus.Failed)}')
                    AND retry_count < max_retries
                    AND next_retry_at < now()
-                 LIMIT {BatchSize}
+                 LIMIT {options.Value.BatchSize}
                  FOR UPDATE SKIP LOCKED
                  """,
                 transaction: transaction)).AsList();
