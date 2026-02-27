@@ -34,9 +34,8 @@ public class OutboxHeartbeatWorker(
         var affected = await connection.ExecuteAsync(
             $"""
              UPDATE orders.outbox_messages
-             SET status = '{nameof(OutboxMessageStatus.Created)}', started_processing_at = NULL
-             WHERE status = '{nameof(OutboxMessageStatus.Processing)}'
-               AND started_processing_at < @Threshold
+             SET status = '{nameof(OutboxMessageStatus.Failed)}', started_processing_at = NULL
+             WHERE status = '{nameof(OutboxMessageStatus.Processing)}' AND started_processing_at < @Threshold
              """,
             new { Threshold = threshold });
 

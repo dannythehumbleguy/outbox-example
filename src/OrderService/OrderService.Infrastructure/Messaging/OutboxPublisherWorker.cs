@@ -54,7 +54,10 @@ public class OutboxPublisherWorker(
             await connection.ExecuteAsync(
                 $"""
                  UPDATE orders.outbox_messages
-                 SET status = '{nameof(OutboxMessageStatus.Processing)}', started_processing_at = @Now
+                 SET status = '{nameof(OutboxMessageStatus.Processing)}',
+                     started_processing_at = @Now,
+                     retry_count = retry_count + 1,
+                     last_attempted_at = @Now
                  WHERE id = ANY(@Ids)
                  """,
                 new { Ids = messages.Select(m => m.Id).ToArray(), Now = DateTimeOffset.UtcNow },
@@ -111,9 +114,7 @@ public class OutboxPublisherWorker(
                 $"""
                  UPDATE orders.outbox_messages
                  SET status = '{nameof(OutboxMessageStatus.Failed)}',
-                     last_attempted_at = now(),
-                     next_retry_at = now() + (INTERVAL '1 second' * @InitialRetryDelaySeconds * POWER(2, retry_count)),
-                     retry_count = retry_count + 1
+                     next_retry_at = now() + (INTERVAL '1 second' * @InitialRetryDelaySeconds * POWER(2, retry_count - 1))
                  WHERE id = ANY(@Ids)
                  """,
                 new { Ids = failedMessages.Select(m => m.Id).ToArray(), options.Value.InitialRetryDelaySeconds });
