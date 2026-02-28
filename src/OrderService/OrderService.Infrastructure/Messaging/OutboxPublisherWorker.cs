@@ -23,12 +23,17 @@ public class OutboxPublisherWorker(
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            await ProcessOutboxMessagesAsync();
+            var messagesCount = await ProcessOutboxMessagesAsync();
+            if(messagesCount == 0)
+                await Task.Delay(1000, stoppingToken);
         }
     }
 
-    private async Task ProcessOutboxMessagesAsync()
+    private async Task<int> ProcessOutboxMessagesAsync()
     {
+        var runId = Guid.NewGuid().ToString("N")[..8];
+        using var logScope = logger.BeginScope(new Dictionary<string, object?> { ["OutboxRunId"] = runId });
+
         List<OutboxMessage> messages;
         using (var connection = connectionFactory.CreateConnection())
         {
@@ -45,15 +50,17 @@ public class OutboxPublisherWorker(
                  WHERE status IN ('{nameof(OutboxMessageStatus.Created)}', '{nameof(OutboxMessageStatus.Failed)}')
                    AND retry_count < max_retries
                    AND next_retry_at < now()
+                 ORDER BY occurred_on
                  LIMIT {options.Value.BatchSize}
                  FOR UPDATE SKIP LOCKED
                  """,
                 transaction: transaction)).AsList();
 
-            if (messages.Count == 0) return;
-
-            logger.LogInformation("Picked up {Count} outbox message(s) for processing", messages.Count);
-
+            logger.LogInformation("Found {Count} outbox message(s) for processing", messages.Count);
+            
+            if (messages.Count == 0) 
+                return 0;
+            
             await connection.ExecuteAsync(
                 $"""
                  UPDATE orders.outbox_messages
@@ -136,5 +143,7 @@ public class OutboxPublisherWorker(
                  """,
                 new { Ids = failedMessages.Select(m => m.Id).ToArray(), options.Value.InitialRetryDelaySeconds });
         }
+
+        return messages.Count;
     }
 }

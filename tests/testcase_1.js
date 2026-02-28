@@ -6,9 +6,9 @@ export const options = {
     scenarios: {
         constant_rps: {
             executor: 'constant-arrival-rate',
-            rate: 300,
+            rate: 500,
             timeUnit: '1s',
-            duration: '5m',
+            duration: '20m',
             preAllocatedVUs: 100,
             maxVUs: 200,
         },

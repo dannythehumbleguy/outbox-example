@@ -2,5 +2,5 @@
 
 up:
 	docker compose up --build -d \
-		--scale orders-api=5 \
-		--scale payment-api=3
+		--scale orders-api=10 \
+		--scale payment-api=5

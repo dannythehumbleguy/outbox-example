@@ -57,7 +57,7 @@ public static class DependencyInjection
         services.AddKafka(kafka => kafka
             .AddCluster(cluster => cluster
                 .WithBrokers(kafkaBrokers.Split(','))
-                .CreateTopicIfNotExists(KafkaTopics.OrderEvents, 3, 1)
+                .CreateTopicIfNotExists(KafkaTopics.OrderEvents, 5, 1)
                 .AddProducer(KafkaProducers.OrderEvents, producer => producer
                     .DefaultTopic(KafkaTopics.OrderEvents)
                     .WithProducerConfig(new ProducerConfig

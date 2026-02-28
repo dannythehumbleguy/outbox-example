@@ -26,6 +26,7 @@ public class OutboxCleanupWorker(
     private async Task DeleteProcessedMessagesAsync()
     {
         var threshold = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(options.Value.RetentionMinutes);
+        logger.LogInformation("Deleting outbox messages, threshold {Threshold}", threshold);
 
         using var connection = connectionFactory.CreateConnection();
 
@@ -37,6 +38,7 @@ public class OutboxCleanupWorker(
                  WHERE status = '{nameof(OutboxMessageStatus.Processed)}'
                    AND processed_at < @Threshold
                  LIMIT @BatchSize
+                 FOR UPDATE SKIP LOCKED
              )
              """,
             new { Threshold = threshold, options.Value.BatchSize });
