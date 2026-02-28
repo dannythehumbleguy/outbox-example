@@ -35,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<IOrderService, OrderAppService>();
         services.AddScoped<IEventPublisher, KafkaEventPublisher>();
         services.AddScoped<IOutboxMessageHandler, OrderCreatedOutboxHandler>();
+        services.AddSingleton<OutboxMetrics>();
         services.AddHostedService<OutboxPublisherWorker>();
         services.AddHostedService<OutboxHeartbeatWorker>();
 

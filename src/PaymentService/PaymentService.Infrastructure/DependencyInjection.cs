@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddSingleton<IDbConnectionFactory>(new NpgsqlConnectionFactory(connectionString));
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IPaymentService, PaymentAppService>();
+        services.AddSingleton<OutboxMetrics>();
 
         services.AddSingleton<IVersionTableMetaData, VersionTableMetaData>();
 

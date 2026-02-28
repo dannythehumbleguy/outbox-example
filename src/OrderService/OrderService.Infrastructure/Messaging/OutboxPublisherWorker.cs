@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -13,8 +14,10 @@ public class OutboxPublisherWorker(
     IDbConnectionFactory connectionFactory,
     IServiceScopeFactory scopeFactory,
     IOptions<OutboxOptions> options,
+    OutboxMetrics metrics,
     ILogger<OutboxPublisherWorker> logger) : BackgroundService
 {
+    private static readonly ActivitySource ActivitySource = new("OrderService.Outbox");
     private const int BatchSize = 100;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -37,7 +40,8 @@ public class OutboxPublisherWorker(
                 $"""
                  SELECT id AS Id, occurred_on AS OccurredOn, type AS Type, payload AS Payload, status AS Status,
                         processed_at AS ProcessedAt, retry_count AS RetryCount, max_retries AS MaxRetries,
-                        last_attempted_at AS LastAttemptedAt, next_retry_at AS NextRetryAt
+                        last_attempted_at AS LastAttemptedAt, next_retry_at AS NextRetryAt,
+                        traceparent AS TraceContext
                  FROM orders.outbox_messages
                  WHERE status IN ('{nameof(OutboxMessageStatus.Created)}', '{nameof(OutboxMessageStatus.Failed)}')
                    AND retry_count < max_retries
@@ -81,14 +85,28 @@ public class OutboxPublisherWorker(
                 continue;
             }
 
+            var parentContext = default(ActivityContext);
+            if (message.TraceContext is not null)
+                ActivityContext.TryParse(message.TraceContext, null, isRemote: true, out parentContext);
+
+            using var activity = ActivitySource.StartActivity(
+                "outbox process",
+                ActivityKind.Producer,
+                parentContext);
+
+            activity?.SetTag("messaging.outbox.message_id", message.Id);
+            activity?.SetTag("messaging.outbox.message_type", message.Type);
+
             try
             {
-                await handler.HandleAsync(message.Payload, message.Id);
+                await handler.HandleAsync(message.Payload, message.Id, message.OccurredOn);
                 processedMessages.Add(message);
+                metrics.PublishLatency.Observe((DateTimeOffset.UtcNow - message.OccurredOn).TotalSeconds);
                 logger.LogInformation("Successfully published outbox message {Id} of type {Type}", message.Id, message.Type);
             }
             catch (Exception ex)
             {
+                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 logger.LogError(ex, "Failed to publish outbox message {Id} of type {Type}", message.Id, message.Type);
                 failedMessages.Add(message);
             }

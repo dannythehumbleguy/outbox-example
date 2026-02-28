@@ -1,5 +1,6 @@
 using KafkaFlow;
 using OpenTelemetry.Resources;
+using Prometheus;
 using OpenTelemetry.Trace;
 using OrderService.Infrastructure;
 using Serilog;
@@ -15,6 +16,8 @@ builder.Host.UseSerilog((context, configuration) =>
     configuration
         .MinimumLevel.Information()
         .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
+        .Enrich.FromLogContext()
+        .Enrich.With(new ActivityEnricher())
         .Enrich.WithProperty("Application", "order-service")
         .Enrich.WithProperty("Instance", Environment.MachineName)
         .WriteTo.Console(outputTemplate:
@@ -23,7 +26,7 @@ builder.Host.UseSerilog((context, configuration) =>
         [
             new LokiLabel { Key = "app", Value = "order-service" },
             new LokiLabel { Key = "instance", Value = Environment.MachineName }
-        ], propertiesAsLabels: ["TraceId", "SpanId"]);
+        ], textFormatter: new LokiFormatter());
 });
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -39,8 +42,8 @@ builder.Services.AddOpenTelemetry()
     .ConfigureResource(resource => resource.AddService("order-service", serviceInstanceId: Environment.MachineName))
     .WithTracing(tracing => tracing
         .AddAspNetCoreInstrumentation()
-        .AddSource("Npgsql")
         .AddSource("OrderService.Kafka")
+        .AddSource("OrderService.Outbox")
         .AddOtlpExporter(options => options.Endpoint = new Uri(tempoEndpoint)));
 
 builder.Services.AddControllers();
@@ -65,5 +68,6 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.MapControllers();
+app.MapMetrics();
 
 app.Run();
