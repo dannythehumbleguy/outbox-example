@@ -1,4 +1,5 @@
 using System.Data;
+using System.Diagnostics;
 using System.Text.Json;
 using Dapper;
 using Microsoft.Extensions.Options;
@@ -18,12 +19,13 @@ public class OutboxMessageRepository(IOptions<OutboxOptions> options) : IOutboxM
             OccurredOn = DateTimeOffset.UtcNow,
             Type = typeof(T).Name,
             Payload = JsonSerializer.Serialize(payload),
-            MaxRetries = options.Value.MaxRetries
+            MaxRetries = options.Value.MaxRetries,
+            TraceContext = Activity.Current?.Id
         };
 
         const string sql = """
-            INSERT INTO orders.outbox_messages (id, occurred_on, type, payload, status, retry_count, max_retries, next_retry_at)
-            VALUES (@Id, @OccurredOn, @Type, @Payload::jsonb, @Status, @RetryCount, @MaxRetries, @NextRetryAt)
+            INSERT INTO orders.outbox_messages (id, occurred_on, type, payload, status, retry_count, max_retries, next_retry_at, traceparent)
+            VALUES (@Id, @OccurredOn, @Type, @Payload::jsonb, @Status, @RetryCount, @MaxRetries, @NextRetryAt, @TraceContext)
             """;
 
         await connection.ExecuteAsync(sql, new
@@ -35,7 +37,8 @@ public class OutboxMessageRepository(IOptions<OutboxOptions> options) : IOutboxM
             Status = message.Status.ToString(),
             message.RetryCount,
             message.MaxRetries,
-            message.NextRetryAt
+            message.NextRetryAt,
+            message.TraceContext
         }, transaction);
     }
 }

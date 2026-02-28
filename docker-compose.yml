@@ -173,6 +173,17 @@ services:
       - ./devops/tempo/tempo.yaml:/etc/tempo/tempo.yaml
       - tempo_data:/var/tempo
 
+  prometheus:
+    image: prom/prometheus:v3.10.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./devops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - orders-api
+      - payment-api
+
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
