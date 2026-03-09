@@ -71,7 +71,8 @@ public class OutboxPublisherWorker(
 
             try
             {
-                await handler.HandleAsync(message.Payload, message.Id);
+                await handler.PublishAsync(message.Payload, message.Id);
+                logger.LogInformation("Successfully published outbox message {Id} of type {Type}", message.Id, message.Type);
                 processedMessages.Add(message);
             }
             catch (Exception ex)
