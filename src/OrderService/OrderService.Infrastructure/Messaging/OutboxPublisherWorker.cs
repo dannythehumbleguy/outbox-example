@@ -71,15 +71,15 @@ public class OutboxPublisherWorker(
         }
 
         using var scope = scopeFactory.CreateScope();
-        var handlers = scope.ServiceProvider.GetRequiredService<IEnumerable<IOutboxMessageHandler>>();
+        var producers = scope.ServiceProvider.GetRequiredService<IEnumerable<IOutboxMessageProducer>>();
         var processedMessages = new List<OutboxMessage>();
         var failedMessages = new List<OutboxMessage>();
 
         foreach (var message in messages)
         {
-            var handler = handlers.FirstOrDefault(h => h.MessageType == message.Type);
+            var producer = producers.FirstOrDefault(h => h.MessageType == message.Type);
 
-            if (handler is null)
+            if (producer is null)
             {
                 logger.LogWarning("No handler registered for outbox message type: {Type}", message.Type);
                 continue;
@@ -99,7 +99,7 @@ public class OutboxPublisherWorker(
 
             try
             {
-                await handler.HandleAsync(message.Payload, message.Id, message.OccurredOn);
+                await producer.PublishAsync(message.Payload, message.Id, message.OccurredOn);
                 processedMessages.Add(message);
                 metrics.PublishLatency.Observe((DateTimeOffset.UtcNow - message.OccurredOn).TotalSeconds);
                 logger.LogInformation("Successfully published outbox message {Id} of type {Type}", message.Id, message.Type);

@@ -5,11 +5,11 @@ using OrderService.Application.Interfaces;
 
 namespace OrderService.Infrastructure.Messaging;
 
-public class OrderCreatedOutboxHandler(IEventPublisher eventPublisher) : IOutboxMessageHandler
+public class OrderCreatedOutboxProducer(IEventPublisher eventPublisher) : IOutboxMessageProducer
 {
     public string MessageType => nameof(OrderCreatedEvent);
 
-    public async Task HandleAsync(string payload, Guid messageId, DateTimeOffset occurredOn)
+    public async Task PublishAsync(string payload, Guid messageId, DateTimeOffset occurredOn)
     {
         var evt = JsonSerializer.Deserialize<OrderCreatedEvent>(payload)!;
         await eventPublisher.PublishAsync(KafkaTopics.OrderEvents, evt, messageId, occurredOn);
