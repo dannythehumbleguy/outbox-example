@@ -1,6 +1,6 @@
 namespace OrderService.Application.Interfaces;
 
-public interface IOutboxMessageHandler
+public interface IOutboxMessageProducer
 {
     string MessageType { get; }
     Task PublishAsync(string payload, Guid messageId);
