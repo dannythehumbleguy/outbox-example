@@ -85,7 +85,7 @@ services:
         condition: service_healthy
 
   traefik:
-    image: traefik:v3.2
+    image: traefik:v3.6
     container_name: traefik
     command:
       - "--api.insecure=true"

@@ -60,6 +60,8 @@ public class OutboxPublisherWorker(
 
             using var connection = connectionFactory.CreateConnection();
             await connection.ExecuteAsync(updateSql, new { message.Id });
+            
+            logger.LogInformation("Successfully published outbox message {Id} of type {Type}", message.Id, message.Type);
         }
         catch (Exception ex)
         {
