@@ -12,6 +12,6 @@ public class OrderCreatedOutboxProducer(IEventPublisher eventPublisher) : IOutbo
     public async Task PublishAsync(string payload, Guid messageId, DateTimeOffset occurredOn)
     {
         var evt = JsonSerializer.Deserialize<OrderCreatedEvent>(payload)!;
-        await eventPublisher.PublishAsync(KafkaTopics.OrderEvents, evt, messageId, occurredOn);
+        await eventPublisher.PublishAsync(KafkaTopics.OrderEvents, evt.Id.ToString(), evt, messageId, occurredOn);
     }
 }
