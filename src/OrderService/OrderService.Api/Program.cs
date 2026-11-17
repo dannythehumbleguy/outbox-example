@@ -1,8 +1,10 @@
 using KafkaFlow;
+using System.Diagnostics;
 using OpenTelemetry.Resources;
 using Prometheus;
 using OpenTelemetry.Trace;
 using OrderService.Infrastructure;
+using OrderService.Application.Services;
 using Serilog;
 using Serilog.Sinks.Grafana.Loki;
 
@@ -57,7 +59,19 @@ var pathBase = builder.Configuration["PathBase"] ?? "";
 if (!string.IsNullOrEmpty(pathBase))
     app.UsePathBase(pathBase);
 
-DependencyInjection.ApplyMigrations(app.Services);
+app.Use(async (context, next) =>
+{
+    context.RequestServices.GetRequiredService<RequestTiming>().StartedAt =
+        Activity.Current?.StartTimeUtc ?? DateTimeOffset.UtcNow;
+    await next();
+});
+
+var migrateOnly = builder.Configuration.GetValue("Database:MigrateOnly", false);
+if (migrateOnly || builder.Configuration.GetValue("Database:MigrateOnStartup", true))
+    DependencyInjection.ApplyMigrations(app.Services);
+
+if (migrateOnly)
+    return;
 
 var kafkaBus = app.Services.CreateKafkaBus();
 await kafkaBus.StartAsync();

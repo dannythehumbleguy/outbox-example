@@ -5,7 +5,7 @@ using OrderService.Application.Interfaces;
 
 namespace OrderService.Infrastructure.Messaging;
 
-public class KafkaEventPublisher(IProducerAccessor producerAccessor) : IEventPublisher
+public class KafkaEventPublisher(IProducerAccessor producerAccessor, OutboxPublishContext publishContext) : IEventPublisher
 {
     public Task PublishAsync<T>(string topic, string key, T message, Guid idempotencyKey, DateTimeOffset occurredOn) where T : class
     {
@@ -13,6 +13,8 @@ public class KafkaEventPublisher(IProducerAccessor producerAccessor) : IEventPub
         var headers = new MessageHeaders();
         headers.SetString("idempotency-key", idempotencyKey.ToString());
         headers.SetString("x-outbox-occurred-on", occurredOn.ToString("O"));
+        if (publishContext.RequestStartedAt is { } startedAt)
+            headers.SetString("x-request-started-at", startedAt.ToString("O"));
         return producer.ProduceAsync(topic, key, message, headers);
     }
 }

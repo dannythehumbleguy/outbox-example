@@ -1,0 +1,10 @@
+- name: Read replica counts
+  ansible.builtin.set_fact:
+    replicas:
+      orders: "{{ lookup('ansible.builtin.env', 'ORDERS_REPLICAS', default='4') }}"
+      payment: "{{ lookup('ansible.builtin.env', 'PAYMENT_REPLICAS', default='4') }}"
+- name: Require non-negative integer replica counts
+  ansible.builtin.assert:
+    that: item.value is match('^[0-9]+$')
+    fail_msg: Replica counts must be non-negative integers.
+  loop: "{{ replicas | dict2items }}"

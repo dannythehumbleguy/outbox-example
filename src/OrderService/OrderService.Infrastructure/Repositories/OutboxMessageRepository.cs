@@ -4,12 +4,13 @@ using System.Text.Json;
 using Dapper;
 using Microsoft.Extensions.Options;
 using OrderService.Application.Interfaces;
+using OrderService.Application.Services;
 using OrderService.Domain.Entities;
 using OrderService.Infrastructure.Messaging;
 
 namespace OrderService.Infrastructure.Repositories;
 
-public class OutboxMessageRepository(IOptions<OutboxOptions> options) : IOutboxMessageRepository
+public class OutboxMessageRepository(IOptions<OutboxOptions> options, RequestTiming requestTiming) : IOutboxMessageRepository
 {
     public async Task CreateAsync<T>(T payload, IDbConnection connection, IDbTransaction transaction) where T : class
     {
@@ -20,12 +21,13 @@ public class OutboxMessageRepository(IOptions<OutboxOptions> options) : IOutboxM
             Type = typeof(T).Name,
             Payload = JsonSerializer.Serialize(payload),
             MaxRetries = options.Value.MaxRetries,
-            TraceContext = Activity.Current?.Id
+            TraceContext = Activity.Current?.Id,
+            RequestStartedAt = requestTiming.StartedAt
         };
 
         const string sql = """
-            INSERT INTO orders.outbox_messages (id, occurred_on, type, payload, status, retry_count, max_retries, next_retry_at, traceparent)
-            VALUES (@Id, @OccurredOn, @Type, @Payload::jsonb, @Status, @RetryCount, @MaxRetries, @NextRetryAt, @TraceContext)
+            INSERT INTO orders.outbox_messages (id, occurred_on, type, payload, status, retry_count, max_retries, next_retry_at, traceparent, request_started_at)
+            VALUES (@Id, @OccurredOn, @Type, @Payload::jsonb, @Status, @RetryCount, @MaxRetries, @NextRetryAt, @TraceContext, @RequestStartedAt)
             """;
 
         await connection.ExecuteAsync(sql, new
@@ -38,7 +40,8 @@ public class OutboxMessageRepository(IOptions<OutboxOptions> options) : IOutboxM
             message.RetryCount,
             message.MaxRetries,
             message.NextRetryAt,
-            message.TraceContext
+            message.TraceContext,
+            message.RequestStartedAt
         }, transaction);
     }
 }

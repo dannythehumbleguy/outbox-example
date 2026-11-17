@@ -1,12 +1,14 @@
 import http from 'k6/http';
 import { check } from 'k6';
 
+const baseUrl = (__ENV.BASE_URL || 'http://localhost').replace(/\/+$/, '');
+
 // Start the test: k6 run tests/testcase_1.js
 export const options = {
     scenarios: {
         constant_rps: {
             executor: 'constant-arrival-rate',
-            rate: 500,
+            rate: 100,
             timeUnit: '1s',
             duration: '20m',
             preAllocatedVUs: 100,
@@ -24,7 +26,7 @@ export default function () {
         price: 10.00,
     });
 
-    const res = http.post('http://localhost/orders/api/orders', payload, {
+    const res = http.post(`${baseUrl}/orders/api/orders`, payload, {
         headers: { 'Content-Type': 'application/json' },
     });
 

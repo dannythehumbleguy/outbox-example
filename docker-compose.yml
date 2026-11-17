@@ -44,6 +44,13 @@ services:
       timeout: 5s
       retries: 5
 
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.9.0
+    command: ["--kafka.server=kafka:9092"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+
   akhq:
     image: tchiotludo/akhq:0.26.0
     container_name: orders-akhq

@@ -4,6 +4,11 @@ namespace PaymentService.Infrastructure.Messaging;
 
 public sealed class OutboxMetrics
 {
+    public readonly Histogram OrderProcessingLatency = Metrics.CreateHistogram(
+        "order_processing_latency_seconds",
+        "Time from the order creation HTTP request to payment processing completion",
+        new HistogramConfiguration { Buckets = Histogram.ExponentialBuckets(0.01, 2, 16) });
+
     public readonly Histogram ConsumerLatency = Metrics.CreateHistogram(
         "outbox_consumer_latency_seconds",
         "Time from outbox record creation to payment processing completion",

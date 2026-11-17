@@ -1,0 +1,120 @@
+- name: Prepare storage for ECS infrastructure tasks
+  hosts: infrastructure
+  become: true
+  gather_facts: false
+  vars:
+    deploy_path: /opt/outbox
+  pre_tasks:
+    - name: Wait for SSH
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+    - name: Gather host facts
+      ansible.builtin.setup:
+    - name: Wait for initial host configuration
+      ansible.builtin.command: cloud-init status --wait
+      changed_when: false
+  tasks:
+    - name: Install filesystem tools
+      ansible.builtin.dnf:
+        name: e2fsprogs
+        state: present
+    - name: Prepare attached storage
+      ansible.builtin.import_tasks: tasks/storage.yml
+    - name: Create configuration directory
+      ansible.builtin.file:
+        path: "{{ deploy_path }}"
+        state: directory
+        mode: '0755'
+    - name: Create data directories
+      ansible.builtin.file:
+        path: "/data/{{ item.name }}"
+        state: directory
+        owner: "{{ item.uid }}"
+        group: "{{ item.uid }}"
+        mode: "{{ '0700' if item.name == 'postgres' else '0750' }}"
+      loop: "{{ data_directories[inventory_hostname] }}"
+      vars:
+        data_directories:
+          orders-db: [{ name: postgres, uid: '999' }]
+          payment-db: [{ name: postgres, uid: '999' }]
+          kafka: [{ name: kafka, uid: '1000' }]
+          observability:
+            - { name: loki, uid: '10001' }
+            - { name: tempo, uid: '10001' }
+            - { name: prometheus, uid: '65534' }
+            - { name: grafana, uid: '472' }
+    - name: Copy Tempo configuration
+      ansible.builtin.copy:
+        src: ../../devops/tempo/tempo.yaml
+        dest: "{{ deploy_path }}/tempo.yml"
+        mode: '0644'
+      when: inventory_hostname in groups['observability']
+      register: tempo_configuration
+    - name: Copy Grafana provisioning
+      ansible.builtin.copy:
+        src: ../../devops/grafana/provisioning/
+        dest: "{{ deploy_path }}/grafana/"
+        mode: '0644'
+        directory_mode: '0755'
+      when: inventory_hostname in groups['observability']
+      register: grafana_configuration
+    - name: Write observability configuration
+      ansible.builtin.template:
+        src: "{{ item }}.j2"
+        dest: "{{ deploy_path }}/{{ item }}"
+        mode: '0644'
+      loop: [prometheus.yml, loki.yml]
+      when: inventory_hostname in groups['observability']
+      register: observability_configuration
+    - name: Mark host preparation complete
+      ansible.builtin.copy:
+        dest: "{{ deploy_path }}/.storage-ready"
+        content: "{{ data_volume_id }}\n"
+        mode: '0644'
+    - name: Start the container runtime and ECS agent after storage is ready
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+        daemon_reload: true
+      loop: [docker, ecs]
+
+# AWS API calls run on the control machine after the hosts are prepared.
+- name: Start supporting ECS services
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+    passwords:
+      orders_database_password: "{{ lookup('ansible.builtin.env', 'ORDERS_DB_PASSWORD') }}"
+      payment_database_password: "{{ lookup('ansible.builtin.env', 'PAYMENT_DB_PASSWORD') }}"
+      grafana_password: "{{ lookup('ansible.builtin.env', 'GRAFANA_ADMIN_PASSWORD') }}"
+  tasks:
+    - name: Validate supporting service passwords
+      ansible.builtin.assert:
+        that: item.value is match('^[a-zA-Z0-9]{32,128}$')
+        fail_msg: Run make setup or set 32–128 alphanumeric passwords in .env.
+      loop: "{{ passwords | dict2items }}"
+      no_log: true
+    - name: Store supporting service passwords
+      ansible.builtin.include_tasks: tasks/store-secret.yml
+      vars:
+        secret_id: "{{ infrastructure_secrets[item.key] }}"
+        secret_value: "{{ item.value }}"
+      loop: "{{ passwords | dict2items }}"
+      no_log: true
+    - name: Start each service and wait for readiness
+      ansible.builtin.include_tasks: tasks/infrastructure.yml
+      loop: [orders-db, payment-db, kafka, observability]
+      loop_control:
+        loop_var: infrastructure_name
+      vars:
+        service_name: "{{ infrastructure_name }}"
+        service_definition: "{{ infrastructure_definitions[infrastructure_name] }}"
+        service_replicas: 1
+        service_refresh: >-
+          {{ infrastructure_name == 'observability' and
+             ((hostvars['observability'].tempo_configuration.changed | default(false)) or
+              (hostvars['observability'].grafana_configuration.changed | default(false)) or
+              (hostvars['observability'].observability_configuration.changed | default(false))) }}

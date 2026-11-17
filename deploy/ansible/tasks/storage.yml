@@ -1,0 +1,30 @@
+- name: Find attached EBS volume by its serial number
+  ansible.builtin.command: lsblk --json --output PATH,SERIAL,FSTYPE,MOUNTPOINT
+  register: disks
+  changed_when: false
+  until: (disks.stdout | from_json).blockdevices | selectattr('serial', 'equalto', data_volume_id | replace('-', '')) | list | length == 1
+  retries: 12
+  delay: 5
+
+- name: Select the data device
+  ansible.builtin.set_fact:
+    data_device: "{{ ((disks.stdout | from_json).blockdevices | selectattr('serial', 'equalto', data_volume_id | replace('-', '')) | list | first).path }}"
+
+- name: Create filesystem on data volume
+  community.general.filesystem:
+    dev: "{{ data_device }}"
+    fstype: ext4
+    force: false
+
+- name: Read filesystem UUID
+  ansible.builtin.command: "blkid -s UUID -o value {{ data_device }}"
+  register: data_uuid
+  changed_when: false
+
+- name: Mount data volume persistently
+  ansible.posix.mount:
+    path: /data
+    src: "UUID={{ data_uuid.stdout }}"
+    fstype: ext4
+    opts: defaults
+    state: mounted

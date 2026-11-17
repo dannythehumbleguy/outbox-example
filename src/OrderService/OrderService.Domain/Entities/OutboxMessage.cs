@@ -16,6 +16,7 @@ public class OutboxMessage
     public DateTimeOffset? LastAttemptedAt { get; set; }
     public DateTimeOffset NextRetryAt { get; set; } = DateTimeOffset.UtcNow;
     public string? TraceContext { get; set; }
+    public DateTimeOffset? RequestStartedAt { get; set; }
 }
 
 

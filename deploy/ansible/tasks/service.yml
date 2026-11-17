@@ -1,0 +1,36 @@
+- name: "Update {{ service_name }}"
+  community.aws.ecs_service:
+    region: "{{ aws_region }}"
+    state: present
+    cluster: "{{ ecs_cluster }}"
+    name: "{{ service_name }}"
+    task_definition: "{{ service_definition }}"
+    desired_count: "{{ service_replicas | int }}"
+    force_new_deployment: "{{ service_refresh | default(false) }}"
+    purge_placement_constraints: false
+    purge_placement_strategy: false
+    deployment_configuration:
+      maximum_percent: 100
+      minimum_healthy_percent: "{{ 50 if service_name in ['orders', 'payment'] else 0 }}"
+      deployment_circuit_breaker:
+        enable: true
+        rollback: true
+- name: "Wait for {{ service_name }} to stabilize"
+  ansible.builtin.command:
+    argv: [aws, ecs, wait, services-stable, --region, "{{ aws_region }}", --cluster, "{{ ecs_cluster }}", --services, "{{ service_name }}", --no-cli-pager]
+  changed_when: false
+- name: Read the resulting service
+  community.aws.ecs_service_info:
+    region: "{{ aws_region }}"
+    cluster: "{{ ecs_cluster }}"
+    service: ["{{ service_name }}"]
+    details: true
+  register: deployed_service
+- name: Verify the requested release and count
+  ansible.builtin.assert:
+    that:
+      - deployed_service.services | length == 1
+      - deployed_service.services[0].taskDefinition == service_definition
+      - deployed_service.services[0].runningCount == service_replicas | int
+      - deployed_service.services[0].pendingCount == 0
+    fail_msg: "{{ service_name }} did not reach the requested release/count; ECS may have rolled it back."

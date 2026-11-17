@@ -1,0 +1,69 @@
+- name: "Start {{ application.item.key }} migration"
+  ansible.builtin.command:
+    argv:
+      - aws
+      - ecs
+      - run-task
+      - --region
+      - "{{ aws_region }}"
+      - --cluster
+      - "{{ ecs_cluster }}"
+      - --task-definition
+      - "{{ application.taskdefinition.taskDefinitionArn }}"
+      - --launch-type
+      - EC2
+      - --count
+      - '1'
+      - --started-by
+      - ansible-migration
+      - --overrides
+      - "{{ migration_overrides | to_json }}"
+      - --output
+      - json
+      - --no-cli-pager
+  vars:
+    migration_overrides:
+      containerOverrides:
+        - name: "{{ application.item.key }}"
+          environment:
+            - { name: Database__MigrateOnly, value: 'true' }
+  register: migration_started
+- name: Read the scheduled migration
+  ansible.builtin.set_fact:
+    migration: "{{ migration_started.stdout | from_json }}"
+- name: Require one scheduled migration task
+  ansible.builtin.assert:
+    that:
+      - migration.failures | default([]) | length == 0
+      - migration.tasks | length == 1
+    fail_msg: "Cannot schedule {{ application.item.key }} migration. Check ECS capacity and service events."
+- name: Wait for migration completion
+  block:
+    - name: Wait for the migration task to stop
+      ansible.builtin.command:
+        argv: [aws, ecs, wait, tasks-stopped, --region, "{{ aws_region }}", --cluster, "{{ ecs_cluster }}", --tasks, "{{ migration.tasks[0].taskArn }}", --no-cli-pager]
+      changed_when: false
+  rescue:
+    - name: Stop the migration after a failed wait
+      ansible.builtin.command:
+        argv: [aws, ecs, stop-task, --region, "{{ aws_region }}", --cluster, "{{ ecs_cluster }}", --task, "{{ migration.tasks[0].taskArn }}", --reason, 'Migration wait failed', --no-cli-pager]
+    - name: Abort deployment
+      ansible.builtin.fail:
+        msg: "Migration timed out. Check ECS task {{ migration.tasks[0].taskArn }} and its CloudWatch logs."
+- name: Read migration result
+  ansible.builtin.command:
+    argv: [aws, ecs, describe-tasks, --region, "{{ aws_region }}", --cluster, "{{ ecs_cluster }}", --tasks, "{{ migration.tasks[0].taskArn }}", --output, json, --no-cli-pager]
+  register: migration_result
+  changed_when: false
+- name: Verify migration exit code
+  ansible.builtin.assert:
+    that:
+      - migration_tasks | length == 1
+      - migration_tasks[0].lastStatus == 'STOPPED'
+      - migration_containers | length == 1
+      - migration_containers[0].exitCode | default(-1) == 0
+    fail_msg: "{{ migration_name }} migration failed. Check the ECS task and its CloudWatch logs."
+  vars:
+    migration_tasks: "{{ (migration_result.stdout | from_json).tasks }}"
+    migration_name: "{{ application.item.key }}"
+    migration_containers: "{{ (migration_tasks | first | default({})).containers | default([]) | selectattr('name', 'equalto', migration_name) | list }}"

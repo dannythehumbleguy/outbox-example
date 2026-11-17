@@ -1,0 +1,29 @@
+#cloud-config
+write_files:
+  - path: /etc/ecs/ecs.config
+    permissions: '0644'
+    content: |
+      ECS_CLUSTER=${cluster_name}
+      ECS_INSTANCE_ATTRIBUTES={"workload":"${workload}"}
+      ECS_RESERVED_MEMORY=256
+      ECS_ENABLE_AWSLOGS_EXECUTIONROLE_OVERRIDE=true
+      ECS_AVAILABLE_LOGGING_DRIVERS=["json-file","awslogs"]
+%{ if workload != "application" ~}
+  - path: /etc/systemd/system/docker.service.d/storage.conf
+    permissions: '0644'
+    content: |
+      [Unit]
+      RequiresMountsFor=/data
+      ConditionPathIsMountPoint=/data
+      ConditionPathExists=/opt/outbox/.storage-ready
+  - path: /etc/systemd/system/ecs.service.d/storage.conf
+    permissions: '0644'
+    content: |
+      [Unit]
+      RequiresMountsFor=/data
+      ConditionPathIsMountPoint=/data
+      ConditionPathExists=/opt/outbox/.storage-ready
+%{ endif ~}
+runcmd:
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, --now, --no-block, ecs.service]

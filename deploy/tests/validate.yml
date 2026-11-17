@@ -1,0 +1,22 @@
+- name: Validate deployment configuration without AWS access
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+    sample_inventory:
+      discovery_domain: outbox-loadtest.internal
+      groups:
+        all: [app-01, app-02, orders-db, payment-db, kafka, observability]
+      hostvars:
+        app-01: { private_ip: 10.42.1.10 }
+        app-02: { private_ip: 10.42.1.11 }
+        orders-db: { private_ip: 10.42.1.12 }
+        payment-db: { private_ip: 10.42.1.13 }
+        kafka: { private_ip: 10.42.1.14 }
+        observability: { private_ip: 10.42.1.15 }
+  tasks:
+    - name: Parse rendered observability configuration
+      ansible.builtin.assert:
+        that: lookup('ansible.builtin.template', '../ansible/templates/' ~ item ~ '.j2', template_vars=sample_inventory) | from_yaml is mapping
+      loop: [loki.yml, prometheus.yml]

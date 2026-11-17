@@ -45,7 +45,7 @@ public class OutboxPublisherWorker(
                  SELECT id AS Id, occurred_on AS OccurredOn, type AS Type, payload AS Payload, status AS Status,
                         processed_at AS ProcessedAt, retry_count AS RetryCount, max_retries AS MaxRetries,
                         last_attempted_at AS LastAttemptedAt, next_retry_at AS NextRetryAt,
-                        traceparent AS TraceContext
+                        traceparent AS TraceContext, request_started_at AS RequestStartedAt
                  FROM orders.outbox_messages
                  WHERE status IN ('{nameof(OutboxMessageStatus.Created)}', '{nameof(OutboxMessageStatus.Failed)}')
                    AND retry_count < max_retries
@@ -78,6 +78,7 @@ public class OutboxPublisherWorker(
 
         using var scope = scopeFactory.CreateScope();
         var producers = scope.ServiceProvider.GetRequiredService<IEnumerable<IOutboxMessageProducer>>();
+        var publishContext = scope.ServiceProvider.GetRequiredService<OutboxPublishContext>();
         var processedMessages = new List<OutboxMessage>();
         var failedMessages = new List<OutboxMessage>();
 
@@ -105,6 +106,7 @@ public class OutboxPublisherWorker(
 
             try
             {
+                publishContext.RequestStartedAt = message.RequestStartedAt;
                 await producer.PublishAsync(message.Payload, message.Id, message.OccurredOn);
                 processedMessages.Add(message);
                 metrics.PublishLatency.Observe((DateTimeOffset.UtcNow - message.OccurredOn).TotalSeconds);
@@ -118,30 +120,51 @@ public class OutboxPublisherWorker(
             }
         }
 
-        using var updateConnection = connectionFactory.CreateConnection();
+        var links = processedMessages.Concat(failedMessages)
+            .Select(message => ActivityContext.TryParse(message.TraceContext, null, isRemote: true, out var context)
+                ? new ActivityLink?(new ActivityLink(context))
+                : null)
+            .Where(link => link.HasValue)
+            .Select(link => link!.Value)
+            .ToArray();
+        using var batchActivity = ActivitySource.StartActivity(
+            "outbox update statuses", ActivityKind.Internal, default(ActivityContext), links: links);
+        batchActivity?.SetTag("messaging.batch.message_count", processedMessages.Count + failedMessages.Count);
 
-        if (processedMessages.Count > 0)
+        try
         {
-            logger.LogInformation("Marked {Count} outbox message(s) as Processed", processedMessages.Count);
-            await updateConnection.ExecuteAsync(
+            using var updateConnection = connectionFactory.CreateConnection();
+
+            if (processedMessages.Count > 0)
+            {
+                await updateConnection.ExecuteAsync(
                 $"""
                  UPDATE orders.outbox_messages
                  SET status = '{nameof(OutboxMessageStatus.Processed)}', processed_at = @ProcessedAt
                  WHERE id = ANY(@Ids)
                  """,
-                new { Ids = processedMessages.Select(m => m.Id).ToArray(), ProcessedAt = DateTimeOffset.UtcNow });
-        }
+                    new { Ids = processedMessages.Select(m => m.Id).ToArray(), ProcessedAt = DateTimeOffset.UtcNow });
+                logger.LogInformation("Marked {Count} outbox message(s) as Processed", processedMessages.Count);
+            }
 
-        if (failedMessages.Count > 0)
-        {
-            await updateConnection.ExecuteAsync(
+            if (failedMessages.Count > 0)
+            {
+                await updateConnection.ExecuteAsync(
                 $"""
                  UPDATE orders.outbox_messages
                  SET status = '{nameof(OutboxMessageStatus.Failed)}',
                      next_retry_at = now() + (INTERVAL '1 second' * @InitialRetryDelaySeconds * POWER(2, retry_count - 1))
                  WHERE id = ANY(@Ids)
                  """,
-                new { Ids = failedMessages.Select(m => m.Id).ToArray(), options.Value.InitialRetryDelaySeconds });
+                    new { Ids = failedMessages.Select(m => m.Id).ToArray(), options.Value.InitialRetryDelaySeconds });
+            }
+        }
+        catch (Exception ex)
+        {
+            batchActivity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            logger.LogError(ex, "Failed to update statuses for {ProcessedCount} processed and {FailedCount} failed outbox messages",
+                processedMessages.Count, failedMessages.Count);
+            throw;
         }
 
         return messages.Count;

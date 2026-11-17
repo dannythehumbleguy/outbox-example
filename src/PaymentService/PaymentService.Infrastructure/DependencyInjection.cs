@@ -49,6 +49,7 @@ public static class DependencyInjection
                     .AddMiddlewares(middlewares => middlewares
                         .Add<TracingConsumerMiddleware>()
                         .AddDeserializer<JsonCoreDeserializer, CustomMessageTypeResolver>()
+                        .Add<OrderProcessingMetricsMiddleware>()
                         .AddTypedHandlers(handlers => handlers
                             .AddHandler<OrderCreatedHandler>())))));
 

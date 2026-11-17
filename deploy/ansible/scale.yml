@@ -1,0 +1,47 @@
+- name: Scale the current application release
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+  tasks:
+    - name: Validate replica counts
+      ansible.builtin.import_tasks: tasks/replicas.yml
+    - name: Read live application services
+      community.aws.ecs_service_info:
+        region: "{{ aws_region }}"
+        cluster: "{{ ecs_cluster }}"
+        service: [orders, payment]
+        details: true
+      register: live
+    - name: Require both application services
+      ansible.builtin.assert:
+        that: live.services | length == 2
+        fail_msg: Run make provision first.
+    - name: Inspect the current release
+      community.aws.ecs_taskdefinition_info:
+        region: "{{ aws_region }}"
+        task_definition: "{{ item.taskDefinition }}"
+      loop: "{{ live.services }}"
+      loop_control:
+        label: "{{ item.serviceName }}"
+      register: definitions
+    - name: Require a deployed release before scaling
+      ansible.builtin.assert:
+        that:
+          - item.container_definitions | default([]) | length == 1
+          - not item.container_definitions[0].image.endswith(':unreleased')
+        fail_msg: Run make deploy before scaling.
+      loop: "{{ definitions.results }}"
+      loop_control:
+        label: "{{ item.item.serviceName }}"
+    - name: Update replica counts using live task definitions
+      ansible.builtin.include_tasks: tasks/service.yml
+      loop: "{{ live.services }}"
+      loop_control:
+        loop_var: application
+        label: "{{ application.serviceName }}"
+      vars:
+        service_name: "{{ application.serviceName }}"
+        service_definition: "{{ application.taskDefinition }}"
+        service_replicas: "{{ replicas[service_name] }}"

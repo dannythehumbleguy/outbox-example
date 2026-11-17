@@ -1,0 +1,22 @@
+- name: Update the supporting service
+  ansible.builtin.import_tasks: service.yml
+- name: Find the supporting task
+  ansible.builtin.command:
+    argv: [aws, ecs, list-tasks, --region, "{{ aws_region }}", --cluster, "{{ ecs_cluster }}", --service-name, "{{ service_name }}", --desired-status, RUNNING, --output, json, --no-cli-pager]
+  register: supporting_tasks
+  changed_when: false
+  until: (supporting_tasks.stdout | from_json).taskArns | length == 1
+  retries: 12
+  delay: 5
+- name: Wait for container health checks
+  ansible.builtin.command:
+    argv: [aws, ecs, describe-tasks, --region, "{{ aws_region }}", --cluster, "{{ ecs_cluster }}", --tasks, "{{ (supporting_tasks.stdout | from_json).taskArns[0] }}", --output, json, --no-cli-pager]
+  register: supporting_health
+  changed_when: false
+  until:
+    - (supporting_health.stdout | from_json).tasks | length == 1
+    - (supporting_health.stdout | from_json).tasks[0].lastStatus == 'RUNNING'
+    - (supporting_health.stdout | from_json).tasks[0].taskDefinitionArn == service_definition
+    - (supporting_health.stdout | from_json).tasks[0].healthStatus == 'HEALTHY'
+  retries: 36
+  delay: 5

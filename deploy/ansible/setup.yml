@@ -1,0 +1,28 @@
+- name: Prepare local deployment configuration
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+    env_path: "{{ playbook_dir }}/../.env"
+  tasks:
+    - name: Create generated directory
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/../generated"
+        state: directory
+        mode: '0700'
+    - name: Create .env without replacing existing settings
+      ansible.builtin.copy:
+        src: ../.env.example
+        dest: "{{ env_path }}"
+        force: false
+        mode: '0600'
+    - name: Fill missing passwords without changing existing ones
+      ansible.builtin.lineinfile:
+        path: "{{ env_path }}"
+        regexp: "^{{ item }}="
+        line: "{{ item }}={{ lookup('ansible.builtin.password', playbook_dir ~ '/../generated/' ~ item ~ '.password', length=48, chars=['ascii_letters', 'digits']) }}"
+        mode: '0600'
+      loop: [ORDERS_DB_PASSWORD, PAYMENT_DB_PASSWORD, GRAFANA_ADMIN_PASSWORD]
+      when: not (lookup('ansible.builtin.file', env_path) | regex_search('(?m)^' ~ item ~ '=.+$'))
+      no_log: true

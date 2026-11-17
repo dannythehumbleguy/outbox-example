@@ -56,7 +56,12 @@ var pathBase = builder.Configuration["PathBase"] ?? "";
 if (!string.IsNullOrEmpty(pathBase))
     app.UsePathBase(pathBase);
 
-DependencyInjection.ApplyMigrations(app.Services);
+var migrateOnly = builder.Configuration.GetValue("Database:MigrateOnly", false);
+if (migrateOnly || builder.Configuration.GetValue("Database:MigrateOnStartup", true))
+    DependencyInjection.ApplyMigrations(app.Services);
+
+if (migrateOnly)
+    return;
 
 var kafkaBus = app.Services.CreateKafkaBus();
 await kafkaBus.StartAsync();

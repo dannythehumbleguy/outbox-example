@@ -1,0 +1,9 @@
+aws_region                  = "eu-central-1"
+project_name                = "outbox-loadtest"
+application_host_count      = 2
+application_instance_type   = "t4g.medium"
+database_instance_type      = "t4g.large"
+kafka_instance_type         = "t4g.large"
+observability_instance_type = "t4g.large"
+data_volume_size_gib        = 50
+ssh_public_key_path         = "/home/danny/.ssh/id_rsa.pub"

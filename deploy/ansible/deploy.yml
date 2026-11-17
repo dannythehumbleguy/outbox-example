@@ -1,0 +1,81 @@
+- name: Deploy application release
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+    database_passwords:
+      orders: "{{ lookup('ansible.builtin.env', 'ORDERS_DB_PASSWORD') }}"
+      payment: "{{ lookup('ansible.builtin.env', 'PAYMENT_DB_PASSWORD') }}"
+  tasks:
+    - name: Validate release settings
+      ansible.builtin.assert:
+        that:
+          - image_tag is match('^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$')
+          - image_tag != 'unreleased'
+        fail_msg: Set a valid IMAGE_TAG.
+    - name: Validate database passwords
+      ansible.builtin.assert:
+        that: item.value is match('^[a-zA-Z0-9]{32,128}$')
+        fail_msg: Run make setup or set the database passwords in .env.
+      loop: "{{ database_passwords | dict2items }}"
+      no_log: true
+    - name: Validate replica counts
+      ansible.builtin.import_tasks: tasks/replicas.yml
+    - name: Check both images exist before deploying
+      ansible.builtin.command:
+        argv:
+          - aws
+          - ecr
+          - describe-images
+          - --region
+          - "{{ aws_region }}"
+          - --repository-name
+          - "{{ item.split('/', 1)[1] }}"
+          - --image-ids
+          - "imageTag={{ image_tag }}"
+          - --no-cli-pager
+      loop: ["{{ orders_repository }}", "{{ payment_repository }}"]
+      changed_when: false
+    - name: Store each service's database connection string
+      ansible.builtin.include_tasks: tasks/store-secret.yml
+      vars:
+        secret_id: "{{ item.value.secret }}"
+        secret_value: "Host={{ item.value.host }};Port=5432;Database={{ item.value.name }};Username=postgres;Password={{ database_passwords[item.key] }};No Reset On Close=true"
+      loop: "{{ databases | dict2items }}"
+      no_log: true
+    - name: Register application task definitions
+      community.aws.ecs_taskdefinition:
+        region: "{{ aws_region }}"
+        state: present
+        family: "{{ item.value.family }}"
+        network_mode: "{{ item.value.networkMode }}"
+        launch_type: EC2
+        execution_role_arn: "{{ item.value.executionRoleArn }}"
+        cpu: "{{ item.value.cpu }}"
+        memory: "{{ item.value.memory }}"
+        runtime_platform: "{{ item.value.runtimePlatform }}"
+        placement_constraints: "{{ item.value.placementConstraints }}"
+        containers: "{{ [item.value.containerDefinitions[0] | combine({'image': item.value.containerDefinitions[0].image | regex_replace(':unreleased$', ':' ~ image_tag)})] }}"
+        # Keep a distinct task revision for each deployment, including redeploys of an existing image.
+        force_create: true
+      loop: "{{ task_definitions | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      register: release
+    - name: Run all migrations before updating services
+      ansible.builtin.include_tasks: tasks/migrate.yml
+      loop: "{{ release.results }}"
+      loop_control:
+        loop_var: application
+        label: "{{ application.item.key }}"
+    - name: Update application services
+      ansible.builtin.include_tasks: tasks/service.yml
+      loop: "{{ release.results }}"
+      loop_control:
+        loop_var: application
+        label: "{{ application.item.key }}"
+      vars:
+        service_name: "{{ application.item.key }}"
+        service_definition: "{{ application.taskdefinition.taskDefinitionArn }}"
+        service_replicas: "{{ replicas[service_name] }}"
