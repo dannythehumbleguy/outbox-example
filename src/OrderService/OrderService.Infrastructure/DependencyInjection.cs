@@ -6,6 +6,7 @@ using KafkaFlow;
 using KafkaFlow.Serializer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using OrderService.Application.Constants;
 using OrderService.Application.Interfaces;
 using OrderService.Application.Services;
@@ -39,7 +40,12 @@ public static class DependencyInjection
         services.AddScoped<IEventPublisher, KafkaEventPublisher>();
         services.AddScoped<IOutboxMessageProducer, OrderCreatedOutboxProducer>();
         services.AddSingleton<OutboxMetrics>();
-        services.AddHostedService<OutboxPublisherWorker>();
+        var publisherWorkers = configuration.GetValue<int?>("Outbox:PublisherWorkers") ?? 1;
+        if (publisherWorkers < 1)
+            throw new ArgumentOutOfRangeException(nameof(publisherWorkers), "Outbox:PublisherWorkers must be at least 1.");
+
+        for (var i = 0; i < publisherWorkers; i++)
+            services.AddSingleton<IHostedService>(provider => ActivatorUtilities.CreateInstance<OutboxPublisherWorker>(provider));
         services.AddHostedService<OutboxHeartbeatWorker>();
         services.AddHostedService<OutboxCleanupWorker>();
 
