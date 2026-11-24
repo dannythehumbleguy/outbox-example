@@ -64,6 +64,7 @@ public static class DependencyInjection
                     .DefaultTopic(KafkaTopics.OrderEvents)
                     .WithProducerConfig(new ProducerConfig
                     {
+                        Acks = Confluent.Kafka.Acks.All,
                         MessageSendMaxRetries = producerOptions.MessageSendMaxRetries,
                         MessageTimeoutMs = producerOptions.MessageTimeoutMs,
                         RequestTimeoutMs = producerOptions.RequestTimeoutMs

@@ -1,17 +1,32 @@
 services:
-  postgres:
+  orders-postgres:
     image: postgres:17
-    container_name: shop-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: shop
+      POSTGRES_DB: orders
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - orders_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d orders"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  payment-postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: payment
+    ports:
+      - "5433:5432"
+    volumes:
+      - payment_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d payment"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -68,15 +83,14 @@ services:
       kafka:
         condition: service_healthy
 
-  pgbouncer:
+  orders-pgbouncer:
     image: edoburu/pgbouncer:v1.25.1-p0
-    container_name: pgbouncer
     environment:
-      DB_HOST: postgres
+      DB_HOST: orders-postgres
       DB_PORT: 5432
       DB_USER: postgres
       DB_PASSWORD: postgres
-      DB_NAME: shop
+      DB_NAME: orders
       POOL_MODE: transaction
       MAX_CLIENT_CONN: 1000
       DEFAULT_POOL_SIZE: 20
@@ -88,7 +102,29 @@ services:
       timeout: 5s
       retries: 5
     depends_on:
-      postgres:
+      orders-postgres:
+        condition: service_healthy
+
+  payment-pgbouncer:
+    image: edoburu/pgbouncer:v1.25.1-p0
+    environment:
+      DB_HOST: payment-postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: payment
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 20
+      AUTH_TYPE: scram-sha-256
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      payment-postgres:
         condition: service_healthy
 
   traefik:
@@ -116,7 +152,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       PathBase: /orders
-      ConnectionStrings__DefaultConnection: Host=pgbouncer;Port=5432;Database=shop;Username=postgres;Password=postgres;No Reset On Close=true
+      ConnectionStrings__DefaultConnection: Host=orders-pgbouncer;Port=5432;Database=orders;Username=postgres;Password=postgres;No Reset On Close=true
       Kafka__Brokers: kafka:9092
       Loki__Url: http://loki:3100
       Otel__TempoEndpoint: http://tempo:4317
@@ -125,7 +161,7 @@ services:
       - "traefik.http.routers.orders.entrypoints=web"
       - "traefik.http.routers.orders.rule=PathPrefix(`/orders`)"
     depends_on:
-      pgbouncer:
+      orders-pgbouncer:
         condition: service_healthy
       kafka:
         condition: service_healthy
@@ -142,7 +178,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       PathBase: /payments
-      ConnectionStrings__DefaultConnection: Host=pgbouncer;Port=5432;Database=shop;Username=postgres;Password=postgres;No Reset On Close=true
+      ConnectionStrings__DefaultConnection: Host=payment-pgbouncer;Port=5432;Database=payment;Username=postgres;Password=postgres;No Reset On Close=true
       Kafka__Brokers: kafka:9092
       Loki__Url: http://loki:3100
       Otel__TempoEndpoint: http://tempo:4317
@@ -151,7 +187,7 @@ services:
       - "traefik.http.routers.payment.entrypoints=web"
       - "traefik.http.routers.payment.rule=PathPrefix(`/payments`)"
     depends_on:
-      pgbouncer:
+      payment-pgbouncer:
         condition: service_healthy
       kafka:
         condition: service_healthy
@@ -210,7 +246,8 @@ services:
         condition: service_started
 
 volumes:
-  postgres_data:
+  orders_postgres_data:
+  payment_postgres_data:
   kafka_data:
   loki_data:
   grafana_data:
